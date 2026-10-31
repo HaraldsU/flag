@@ -11,15 +11,18 @@ namespace po = boost::program_options;
 
 static po::options_description desc("Expected usage:\n  flag [flags] arguments\nAllowed flags");
 static po::variables_map vm;
+static bool show_long;
+static bool show_short;
 
 int set_program_options(int ac, char ** av) {
 	desc.add_options()
 		("help,h", "show help message")
-		("long,l", "show long flag notation, e.g. --help")
-		("short,s", "show short flag notation, e.g. -h")
+		("short,s", po::bool_switch(), "show short flag notation, e.g. -h")
+		("long,l", po::bool_switch(), "show long flag notation, e.g. --help")
 	;
 
-	po::store(po::parse_command_line(ac, av, desc), vm);
+	po::parsed_options parsed = po::parse_command_line(ac, av, desc);
+	po::store(parsed, vm);
 	po::notify(vm); 
 
 	if (vm.count("help")) {
@@ -27,6 +30,13 @@ int set_program_options(int ac, char ** av) {
 
 		return 1;
 	}
+
+	show_long = false;     
+	for (const auto& opt : parsed.options) {
+		if (opt.string_key == "short") show_long = false;
+		else if (opt.string_key == "long") show_long = true;
+	}
+	show_short = !show_long;
 
 	return 0;
 }
@@ -40,13 +50,14 @@ struct iless {
 int main(int ac, char ** av) {
 	set_program_options(ac, av);
 
+	// cout << ac << endl;
 	if (ac < 2) {
 		cout << desc << endl;
 		return 1;
 	}
 
 	string command{ "man 1 "s + av[ac - 1] + " 2>/dev/null | "s + "cat"s};
-	cout << "DEBUG: command = " << command << endl;
+	// cout << "DEBUG: command = " << command << endl;
 	
 	string man_page {};
 	auto po = popen(command.c_str(), "r");
@@ -57,20 +68,20 @@ int main(int ac, char ** av) {
 	pclose(po);
 
 	string r{};
-	if (vm.count("long")) {
+	if (show_short) {
 		r = R"(
-			(?:^|\s+|\W)\K		# Start
-			--[[:alnum:]]+		# Longa form starts with --
-			(?:-\w+)*			# Commands can have - in the middle, e.g. --names-only
-			(?![\w-])			# Has to end with a word character, e.g. --no- is not valid
-		)";
-	}
-	else if (vm.count("short")) {
-		r = R"(
-			(?:^|\s+|\W)\K		# Start
+			(?:\s+)\K			# Start
 			-[[:alnum:]]+		# Short form starts with -
 			(?:-\w+)*			# Commands can have - in the middle, e.g. -names-only
 			(?![\w-])			# Has to end with a word character, e.g. -no- is not valid
+		)";
+	}
+	else if (show_long) {
+		r = R"(
+			(?:\s+)\K			# Start
+			--[[:alnum:]]+		# Long form starts with --
+			(?:-\w+)*			# Commands can have - in the middle, e.g. --names-only
+			(?![\w-])			# Has to end with a word character, e.g. --no- is not valid
 		)";
 	}
 
