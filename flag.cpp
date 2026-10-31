@@ -19,6 +19,7 @@ int set_program_options(int ac, char ** av) {
 		("help,h", "show help message")
 		("short,s", po::bool_switch(), "show short flag notation, e.g. -h")
 		("long,l", po::bool_switch(), "show long flag notation, e.g. --help")
+		("delimiter,d", po::value<string>()->implicit_value("\n"), "specify the delimiter used for separating flags")
 	;
 
 	po::parsed_options parsed = po::parse_command_line(ac, av, desc);
@@ -47,15 +48,7 @@ struct iless {
 	}
 };
 
-int main(int ac, char ** av) {
-	set_program_options(ac, av);
-
-	// cout << ac << endl;
-	if (ac < 2) {
-		cout << desc << endl;
-		return 1;
-	}
-
+string load_man_page(int ac, char ** av) {
 	string command{ "man 1 "s + av[ac - 1] + " 2>/dev/null | "s + "cat"s};
 	// cout << "DEBUG: command = " << command << endl;
 	
@@ -67,10 +60,23 @@ int main(int ac, char ** av) {
 	}
 	pclose(po);
 
+	return man_page;
+}
+
+int main(int ac, char ** av) {
+	set_program_options(ac, av);
+
+	// cout << ac << endl;
+	if (ac < 2) {
+		cout << desc << endl;
+		return 1;
+	}
+	string man_page = load_man_page(ac, av);
+
 	string r{};
 	if (show_short) {
 		r = R"(
-			(?:\s+)\K			# Start
+			(?:\s{2,})\K		# Start
 			-[[:alnum:]]+		# Short form starts with -
 			(?:-\w+)*			# Commands can have - in the middle, e.g. -names-only
 			(?![\w-])			# Has to end with a word character, e.g. -no- is not valid
@@ -94,10 +100,19 @@ int main(int ac, char ** av) {
 		// cout << *mr << endl;
 	}
 
-	// Print set
-	for (auto i : long_commands) {
-		cout << i << endl;
+	string delim {"\n"};
+	if (vm.count("delimiter")) {
+		delim = vm["delimiter"].as<string>();
+		// cout << "delim = " << delim << endl;
 	}
+
+	// Print set
+	// for (auto i : long_commands) {
+	for (auto i = long_commands.begin(); i != long_commands.end(); i++) {
+		if (std::next(i) == long_commands.end()) delim = "";
+		cout << *i << delim;
+	}
+	cout << endl;
 
 	return 0;
 }
