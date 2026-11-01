@@ -21,22 +21,29 @@ static const std::unordered_map<std::string, Mode> kModes {
 };
 static Mode mode = Mode::Short;
 
+static bool is_reverse = false;
+
 int set_program_options(int ac, char ** av) {
 	desc.add_options()
-		("help,h", "Show this help message")
+		("help,h", po::bool_switch(), "Show this help message")
 		("short,s", po::bool_switch(), "Show short flag notation, e.g. -h")
 		("long,l", po::bool_switch(), "Show long flag notation, e.g. --help")
 		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. [-h|--help]")
-		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "\"; \""), "Specify the delimiter used for separating flags, e.g. -d \"\\n\" or --delimiter=\"\\n\". The default delimiter is \"; \". The characters \"\\n\" and \"\\t\" retain special meaning, i.e. the new line and tab characters appropriately.")
+		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "\"; \""), "Specify the delimiter used for separating flags, e.g. -d \"\\n\" or --delimiter=\"\\n\". The default delimiter is \"; \". The characters \"\\n\" and \"\\t\" retain special meaning, i.e. the new line and tab characters appropriately")
+		("reverse,r", po::bool_switch(), "Reverse the sorting of the output")
 	;
 
 	po::parsed_options parsed = po::parse_command_line(ac, av, desc);
 	po::store(parsed, vm);
 	po::notify(vm); 
 
-	if (vm.count("help")) {
+	if (vm["help"].as<bool>() or ac < 2) {
 		cout << desc << endl;
 		return 1;
+	}
+
+	if (vm["reverse"].as<bool>()) {
+		is_reverse = true;
 	}
 
 	for (const auto& opt : parsed.options) {
@@ -58,7 +65,8 @@ struct iless {
 	}
 
 	bool operator()(const string& a, const string& b) const {
-		return boost::algorithm::ilexicographical_compare(alnum_only(a), alnum_only(b));
+		if (is_reverse == true) return boost::algorithm::ilexicographical_compare(alnum_only(b), alnum_only(a));
+		else return boost::algorithm::ilexicographical_compare(alnum_only(a), alnum_only(b));
 	}
 };
 
@@ -162,11 +170,6 @@ void print_commands(set<string, iless> commands, string delim) {
 int main(int ac, char ** av) {
 	auto spo = set_program_options(ac, av);
 	if (spo == 1) return 1;
-
-	if (ac < 2) {
-		cout << desc << endl;
-		return 1;
-	}
 
 	string man_page {};
 	try {
