@@ -31,9 +31,15 @@ int set_program_options(int ac, char ** av) {
 		// ("short,s", po::bool_switch(), "Show short flag notation, e.g. -h")
 		("long,l", po::bool_switch(), "Show long flag notation, e.g. --help (default is short form, e.g. -h)")
 		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. [-h|--help]")
-		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "\"; \""), "Specify the delimiter used for separating flags, e.g. -d \"\\n\" or --delimiter=\"\\n\". The default delimiter is \"; \". The characters \"\\n\" and \"\\t\" retain special meaning, i.e. the new line and tab characters appropriately")
+		("full,f", po::bool_switch(), "Show one explanatory line of the flag from the man page") // TO DO
+		("column,c", po::bool_switch(), "List entries by columns") // TO DO
+		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "'; '"), "Specify the delimiter used for separating flags, e.g. -d '\\n' or --delimiter='\\n'. The default delimiter is '; '. The characters '\\n' and '\\t' retain special meaning, i.e. the new line and tab characters appropriately")
 		("sort,s", po::bool_switch(), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
+		("title,t", po::bool_switch(), "Show the man page NAME section at the start of the output") // TO DO
+		("word-count,w", po::bool_switch(), "Show the printed flag count at the bottom of the output") // TO DO
 		("reverse,r", po::bool_switch(), "Reverse the sorting of the output")
+		("color", po::value<string>()->value_name("WHEN")->implicit_value("never"), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'") // TO DO
+		("debug,D", po::bool_switch(), "Show debug messages") // TO DO
 		("version,v", po::bool_switch(), "Display version information and exit")
 	;
 
