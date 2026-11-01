@@ -1,7 +1,7 @@
 #include <iostream>
 #include <set>
 #include <string>
-#include <stdexcept>
+#include <variant>
 #include <stdio.h>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -21,15 +21,17 @@ static const std::unordered_map<std::string, Mode> kModes {
 };
 static Mode mode = Mode::Short;
 
+static bool is_sort = false;
 static bool is_reverse = false;
 
 int set_program_options(int ac, char ** av) {
 	desc.add_options()
 		("help,h", po::bool_switch(), "Show this help message")
-		("short,s", po::bool_switch(), "Show short flag notation, e.g. -h")
-		("long,l", po::bool_switch(), "Show long flag notation, e.g. --help")
+		// ("short,s", po::bool_switch(), "Show short flag notation, e.g. -h")
+		("long,l", po::bool_switch(), "Show long flag notation, e.g. --help (default is short form, e.g. -h)")
 		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. [-h|--help]")
 		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "\"; \""), "Specify the delimiter used for separating flags, e.g. -d \"\\n\" or --delimiter=\"\\n\". The default delimiter is \"; \". The characters \"\\n\" and \"\\t\" retain special meaning, i.e. the new line and tab characters appropriately")
+		("sort,s", po::bool_switch(), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
 		("reverse,r", po::bool_switch(), "Reverse the sorting of the output")
 	;
 
@@ -41,9 +43,11 @@ int set_program_options(int ac, char ** av) {
 		cout << desc << endl;
 		return 1;
 	}
-
 	if (vm["reverse"].as<bool>()) {
 		is_reverse = true;
+	}
+	if (vm["sort"].as<bool>()) {
+		is_sort = true;
 	}
 
 	for (const auto& opt : parsed.options) {
@@ -55,7 +59,8 @@ int set_program_options(int ac, char ** av) {
 	return 0;
 }
 
-struct iless {
+struct ilexic {
+	// Strip the fluff to compare only words and numbers
 	static string alnum_only(const string& s) {
 		string out;
 		for (unsigned char c : s)
@@ -97,19 +102,19 @@ string set_delimiter() {
 	return delim;
 }
 
-void add_commands(set<string, iless> & commands, string man_page, string r) {
+template <typename A>
+void add_commands(A & commands, string man_page, string r) {
 	const boost::regex expr(r, boost::regex::no_mod_s | boost::regex::mod_x);
-	boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
 
+	boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
 	for (auto mr = sr_iterator; mr != boost::sregex_iterator(); mr++) {
-		commands.insert(mr->str());
+		if (is_reverse == false) commands.insert(commands.end(), mr->str());
+		else commands.insert(commands.begin(), mr->str());
 	}
 }
 
-set<string, iless> get_commands(string man_page) {
-	set<string, iless> commands {};
-	// cout << "mode: " << int(mode) << endl;
-
+template <typename A>
+void get_commands(A & commands, string man_page) {
 	string r{};
 	if (mode == Mode::Short) {
 		r = R"(
@@ -140,12 +145,12 @@ set<string, iless> get_commands(string man_page) {
 			(?=,|[[:space:]]{3,})
 		)";
 	}
-	add_commands(commands, man_page, r);
 
-	return commands;
+	add_commands(commands, man_page, r);
 }
 
-void print_commands(set<string, iless> commands, string delim) {
+template <typename A>
+void print_commands(A commands, string delim) {
 	for (auto i = commands.begin(); i != commands.end(); i++) {
 		if (std::next(i) == commands.end()) delim = "";
 		if (mode == Mode::Mixed) {
@@ -174,9 +179,14 @@ int main(int ac, char ** av) {
 	string man_page {};
 	try {
 		man_page = load_man_page(ac, av);
-		set<string, iless> commands {get_commands(man_page)};
+
+		variant<set<string, ilexic>, vector<string>> commands;
+		if (is_sort == true) commands = set<string, ilexic>{};
+		else commands = vector<string>{};
+		visit([&](auto & c) { get_commands(c, man_page); }, commands);
+
 		string delim = set_delimiter();
-		print_commands(commands, delim);
+		visit([&](auto & c) { print_commands(c, delim); }, commands);
 
 		return 0;
 	} catch (const string& e) {
