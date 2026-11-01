@@ -1,6 +1,7 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <stdexcept>
 #include <stdio.h>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -26,7 +27,7 @@ int set_program_options(int ac, char ** av) {
 		("short,s", po::bool_switch(), "Show short flag notation, e.g. -h")
 		("long,l", po::bool_switch(), "Show long flag notation, e.g. --help")
 		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. -h [ --help ]")
-		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "\"; \""), "Specify the delimiter used for separating flags")
+		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "\"; \""), "Specify the delimiter used for separating flags, e.g. -d \"\\n\" or --delimiter=\"\\n\". The default delimiter is \"; \". The characters \"\\n\" and \"\\t\" retain special meaning, i.e. the new line and tab characters appropriately.")
 	;
 
 	po::parsed_options parsed = po::parse_command_line(ac, av, desc);
@@ -34,9 +35,8 @@ int set_program_options(int ac, char ** av) {
 	po::notify(vm); 
 
 	if (vm.count("help")) {
-		cout << desc;
-
-		return 0;
+		cout << desc << endl;
+		return 1;
 	}
 
 	for (const auto& opt : parsed.options) {
@@ -63,7 +63,7 @@ struct iless {
 };
 
 string load_man_page(int ac, char ** av) {
-	string command{ "man 1 "s + av[ac - 1] + " 2>/dev/null | "s + "cat"s};
+	string command{ "man "s + av[ac - 1] + " 2>/dev/null | "s + "cat"s};
 	// cout << "DEBUG: command = " << command << endl;
 	
 	string man_page {};
@@ -74,7 +74,8 @@ string load_man_page(int ac, char ** av) {
 	}
 	pclose(po);
 
-	return man_page;
+	if (man_page.size() == 0) throw std::string{"Man page for command \"" + std::string{av[ac -1]} + "\" not found"};
+	else return man_page;
 }
 
 string set_delimiter() {
@@ -99,31 +100,36 @@ void add_commands(set<string, iless> & commands, string man_page, string r) {
 
 set<string, iless> get_commands(string man_page) {
 	set<string, iless> commands {};
-	cout << "mode: " << int(mode) << endl;
+	// cout << "mode: " << int(mode) << endl;
 
 	string r{};
 	if (mode == Mode::Short) {
 		r = R"(
-			(?:[[:space:]]{4,})\K		# Start
-			-[[:alnum:]]+				# Short form starts with -
-			(?:-\w+)*					# Commands can have - in the middle, e.g. -names-only
-			(?=,|[[:space:]]{4,})		# Has to end with a word character, e.g. -no- is not valid
+			(?:[[:space:]]{3,})\K		# Has to start with 3 or more spaces
+			-[[:alnum:]]+				# Short form starts with - followed my alnum, e.g. -a
+			(?:-\w+)*					# Commands can have - in the middle followed by alnum, e.g. -names-only
+			(?=,|[[:space:]]{3,})		# Has to end with a , or 3 or more spaces
 		)";
 	}
 	else if (mode == Mode::Long) {
 		r = R"(
-			 (?:[[:space:]]{4,})\K	 	# Start
-			 --[[:alnum:]]+	 			# Long form starts with --
-			 (?:-\w+)*		 			# Commands can have - in the middle, e.g. --names-only
-			 (?=[[:space:]]{4,})	 	# Has to end with a word character, e.g. --no- is not valid
+			(?:[[:space:]]{3,})\K
+			--[[:alnum:]]+(=\w+)?		# Long form starts with -- followed by alnum, e.g. --all
+										# Long form can have an equal sign (=) followed by an option argument, e.g.
+										# --protocol=family
+			(?:-\w+)*
+			(?=,|[[:space:]]{3,})
 		)";
 	}
 	else if (mode == Mode::Mixed) {
 		r = R"(
-			(?:[[:space:]]{4,})\K																# Start
-			(((-[[:alnum:]]+),[[:space:]](--[[:alnum:]]+))|(-[[:alnum:]]+)|(--[[:alnum:]]+)) 	# Mixed form is -[s-c], --[l-c] or if not both then just short or long form
-			(?:-\w+)*																			# Commands can have - in the middle, e.g. -names-only
-			(?=,|[[:space:]]{4,})																# Has to end with a word character, e.g. -no- is not valid
+			(?:[[:space:]]{3,})\K
+			(((-[[:alnum:]]+),[[:space:]](--[[:alnum:]]+(=\w+)?))| 	# Short form followed by long form, e.g. -a, --all
+			((--[[:alnum:]]+(=\w+)?),[[:space:]](-[[:alnum:]]+))|	# Long form followed by short form, e.g. --all, -a
+			(-[[:alnum:]]+)|										# Short form
+			(--[[:alnum:]]+(=\w+)?))								# Long form
+			(?:-\w+)*
+			(?=,|[[:space:]]{3,})
 		)";
 	}
 	add_commands(commands, man_page, r);
@@ -155,18 +161,25 @@ void print_commands(set<string, iless> commands, string delim) {
 }
 
 int main(int ac, char ** av) {
-	set_program_options(ac, av);
+	auto spo = set_program_options(ac, av);
+	if (spo == 1) return 1;
 
 	if (ac < 2) {
 		cout << desc << endl;
 		return 1;
 	}
 
-	string man_page = load_man_page(ac, av);
-	set<string, iless> commands {get_commands(man_page)};
-	string delim = set_delimiter();
-	print_commands(commands, delim);
+	string man_page {};
+	try {
+		man_page = load_man_page(ac, av);
+		set<string, iless> commands {get_commands(man_page)};
+		string delim = set_delimiter();
+		print_commands(commands, delim);
 
-	return 0;
+		return 0;
+	} catch (const string& e) {
+		cout << e << endl;
+		return 1;
+	}
 }
 
