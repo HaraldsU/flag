@@ -110,21 +110,33 @@ string set_delimiter() {
 }
 
 template <typename A>
-void add_commands(A & commands, string man_page, string r) {
-	const boost::regex expr(r, boost::regex::no_mod_s | boost::regex::mod_x);
-
+void add_commands(A & commands, string man_page, string regx) {
+	const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
 	boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
+	string command {};
+
 	for (auto mr = sr_iterator; mr != boost::sregex_iterator(); mr++) {
-		if (is_reverse == false) commands.insert(commands.end(), mr->str());
-		else commands.insert(commands.begin(), mr->str());
+		auto smatch = *mr;
+		if (smatch[3].matched and smatch[4].matched) { 		// [short|long] format
+			command = smatch[3]+ ", " + smatch[4];		
+		}
+		else if (smatch[6].matched and smatch[7].matched) {	// [long|short] -> [short|long] format
+			command = smatch[7]+ ", " + smatch[6];
+		}
+		else {
+			command = mr->str();
+		}
+
+		if (is_reverse == false) commands.insert(commands.end(), command);
+		else commands.insert(commands.begin(), command);
 	}
 }
 
 template <typename A>
 void get_commands(A & commands, string man_page) {
-	string r{};
+	string regx{};
 	if (mode == Mode::Short) {
-		r = R"(
+		regx = R"(
 			(?:[[:space:]]{3,})\K		# Has to start with 3 or more spaces
 			-[[:alnum:]]+				# Short form starts with - followed my alnum, e.g. -a
 			(?:-\w+)*					# Commands can have - in the middle followed by alnum, e.g. -names-only
@@ -132,7 +144,7 @@ void get_commands(A & commands, string man_page) {
 		)";
 	}
 	else if (mode == Mode::Long) {
-		r = R"(
+		regx = R"(
 			(?:[[:space:]]{3,})\K
 			--[[:alnum:]]+(=\w+)?		# Long form starts with -- followed by alnum, e.g. --all
 										# Long form can have an equal sign (=) followed by an option argument, e.g.
@@ -142,18 +154,18 @@ void get_commands(A & commands, string man_page) {
 		)";
 	}
 	else if (mode == Mode::Mixed) {
-		r = R"(
+		regx = R"(
 			(?:[[:space:]]{3,})\K
-			(((-[[:alnum:]]+),[[:space:]](--[[:alnum:]]+(=\w+)?))| 	# Short form followed by long form, e.g. -a, --all
-			((--[[:alnum:]]+(=\w+)?),[[:space:]](-[[:alnum:]]+))|	# Long form followed by short form, e.g. --all, -a
-			(-[[:alnum:]]+)|										# Short form
-			(--[[:alnum:]]+(=\w+)?))								# Long form
+			(((-[[:alnum:]]+),[[:space:]](--[[:alnum:]]+(?:=\w+)?))| 	# (1, 2, 3, 4) Short form followed by long form, e.g. -a, --all
+			((--[[:alnum:]]+(?:=\w+)?),[[:space:]](-[[:alnum:]]+))|		# (5, 6, 7) Long form followed by short form, e.g. --all, -a
+			(-[[:alnum:]]+)|											# (8) Short form
+			(--[[:alnum:]]+(=\w+)?))									# (9) Long form
 			(?:-\w+)*
 			(?=,|[[:space:]]{3,})
 		)";
 	}
 
-	add_commands(commands, man_page, r);
+	add_commands(commands, man_page, regx);
 }
 
 template <typename A>
@@ -174,7 +186,7 @@ void print_commands(A commands, string delim) {
 			output.append("]"); 
 			cout << output << delim;
 		}
-		else cout << *i << delim;
+		else cout << *i << delim; // Short and long mode
 	}
 	cout << endl;
 }
@@ -186,7 +198,6 @@ int main(int ac, char ** av) {
 	string man_page {};
 	try {
 		man_page = load_man_page(ac, av);
-
 		variant<set<string, ilexic>, vector<string>> commands;
 		if (is_sort == true) commands = set<string, ilexic>{};
 		else commands = vector<string>{};
