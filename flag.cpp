@@ -26,7 +26,7 @@ int set_program_options(int ac, char ** av) {
 		("help,h", "Show this help message")
 		("short,s", po::bool_switch(), "Show short flag notation, e.g. -h")
 		("long,l", po::bool_switch(), "Show long flag notation, e.g. --help")
-		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. -h [ --help ]")
+		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. [-h|--help]")
 		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "\"; \""), "Specify the delimiter used for separating flags, e.g. -d \"\\n\" or --delimiter=\"\\n\". The default delimiter is \"; \". The characters \"\\n\" and \"\\t\" retain special meaning, i.e. the new line and tab characters appropriately.")
 	;
 
@@ -142,17 +142,16 @@ void print_commands(set<string, iless> commands, string delim) {
 		if (std::next(i) == commands.end()) delim = "";
 		if (mode == Mode::Mixed) {
 			string output {};
-			bool is_mixed = false;
 			for (auto c : *i) {
-				if (c != ',') { 
+				if (c != ',' and c != ' ') { 
 					output.append(std::string{c});
 				}
-				else { 
-					output.append(" ["); 
-					is_mixed = true;
+				else if (c != ' ') { 
+					output.append("|"); 
 				}
 			}
-			if (is_mixed) output.append(" ]"); 
+			output = "[" + output;
+			output.append("]"); 
 			cout << output << delim;
 		}
 		else cout << *i << delim;
