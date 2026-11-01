@@ -9,17 +9,24 @@
 using namespace std;
 namespace po = boost::program_options;
 
-static po::options_description desc("Expected usage:\n  flag [flags] arguments\nAllowed flags");
+static po::options_description desc("Usage: flag [flags] arguments\nAllowed flags", 120);
 static po::variables_map vm;
-static bool show_long;
-static bool show_short;
+
+enum class Mode { Short, Long, Mixed};
+static const std::unordered_map<std::string, Mode> kModes {
+	{"short", Mode::Short},
+	{"long",  Mode::Long},
+	{"mixed",  Mode::Mixed}
+};
+static Mode mode = Mode::Short;
 
 int set_program_options(int ac, char ** av) {
 	desc.add_options()
-		("help,h", "show help message")
-		("short,s", po::bool_switch(), "show short flag notation, e.g. -h")
-		("long,l", po::bool_switch(), "show long flag notation, e.g. --help")
-		("delimiter,d", po::value<string>()->implicit_value("\n"), "specify the delimiter used for separating flags")
+		("help,h", "Show this help message")
+		("short,s", po::bool_switch(), "Show short flag notation, e.g. -h")
+		("long,l", po::bool_switch(), "Show long flag notation, e.g. --help")
+		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. -h [ --help ]")
+		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "\"; \""), "Specify the delimiter used for separating flags")
 	;
 
 	po::parsed_options parsed = po::parse_command_line(ac, av, desc);
@@ -27,24 +34,31 @@ int set_program_options(int ac, char ** av) {
 	po::notify(vm); 
 
 	if (vm.count("help")) {
-		cout << desc << endl;
+		cout << desc;
 
-		return 1;
+		return 0;
 	}
 
-	show_long = false;     
 	for (const auto& opt : parsed.options) {
-		if (opt.string_key == "short") show_long = false;
-		else if (opt.string_key == "long") show_long = true;
+		auto it = kModes.find(opt.string_key);
+		if (it != kModes.end())
+			mode = it->second;
 	}
-	show_short = !show_long;
 
 	return 0;
 }
 
 struct iless {
+	static string alnum_only(const string& s) {
+		string out;
+		for (unsigned char c : s)
+			if (std::isalnum(c)) out += c;
+
+		return out;
+	}
+
 	bool operator()(const string& a, const string& b) const {
-		return boost::algorithm::ilexicographical_compare(a, b);
+		return boost::algorithm::ilexicographical_compare(alnum_only(a), alnum_only(b));
 	}
 };
 
@@ -63,56 +77,95 @@ string load_man_page(int ac, char ** av) {
 	return man_page;
 }
 
+string set_delimiter() {
+	string delim {"; "};
+	if (vm.count("delimiter")) {
+		delim = vm["delimiter"].as<string>();
+		if (delim == "\\n") delim = "\n";
+		else if (delim == "\\t") delim = "\t";
+	}
+
+	return delim;
+}
+
+void add_commands(set<string, iless> & commands, string man_page, string r) {
+	const boost::regex expr(r, boost::regex::no_mod_s | boost::regex::mod_x);
+	boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
+
+	for (auto mr = sr_iterator; mr != boost::sregex_iterator(); mr++) {
+		commands.insert(mr->str());
+	}
+}
+
+set<string, iless> get_commands(string man_page) {
+	set<string, iless> commands {};
+	cout << "mode: " << int(mode) << endl;
+
+	string r{};
+	if (mode == Mode::Short) {
+		r = R"(
+			(?:[[:space:]]{4,})\K		# Start
+			-[[:alnum:]]+				# Short form starts with -
+			(?:-\w+)*					# Commands can have - in the middle, e.g. -names-only
+			(?=,|[[:space:]]{4,})		# Has to end with a word character, e.g. -no- is not valid
+		)";
+	}
+	else if (mode == Mode::Long) {
+		r = R"(
+			 (?:[[:space:]]{4,})\K	 	# Start
+			 --[[:alnum:]]+	 			# Long form starts with --
+			 (?:-\w+)*		 			# Commands can have - in the middle, e.g. --names-only
+			 (?=[[:space:]]{4,})	 	# Has to end with a word character, e.g. --no- is not valid
+		)";
+	}
+	else if (mode == Mode::Mixed) {
+		r = R"(
+			(?:[[:space:]]{4,})\K																# Start
+			(((-[[:alnum:]]+),[[:space:]](--[[:alnum:]]+))|(-[[:alnum:]]+)|(--[[:alnum:]]+)) 	# Mixed form is -[s-c], --[l-c] or if not both then just short or long form
+			(?:-\w+)*																			# Commands can have - in the middle, e.g. -names-only
+			(?=,|[[:space:]]{4,})																# Has to end with a word character, e.g. -no- is not valid
+		)";
+	}
+	add_commands(commands, man_page, r);
+
+	return commands;
+}
+
+void print_commands(set<string, iless> commands, string delim) {
+	for (auto i = commands.begin(); i != commands.end(); i++) {
+		if (std::next(i) == commands.end()) delim = "";
+		if (mode == Mode::Mixed) {
+			string output {};
+			bool is_mixed = false;
+			for (auto c : *i) {
+				if (c != ',') { 
+					output.append(std::string{c});
+				}
+				else { 
+					output.append(" ["); 
+					is_mixed = true;
+				}
+			}
+			if (is_mixed) output.append(" ]"); 
+			cout << output << delim;
+		}
+		else cout << *i << delim;
+	}
+	cout << endl;
+}
+
 int main(int ac, char ** av) {
 	set_program_options(ac, av);
 
-	// cout << ac << endl;
 	if (ac < 2) {
 		cout << desc << endl;
 		return 1;
 	}
+
 	string man_page = load_man_page(ac, av);
-
-	string r{};
-	if (show_short) {
-		r = R"(
-			(?:\s{2,})\K		# Start
-			-[[:alnum:]]+		# Short form starts with -
-			(?:-\w+)*			# Commands can have - in the middle, e.g. -names-only
-			(?![\w-])			# Has to end with a word character, e.g. -no- is not valid
-		)";
-	}
-	else if (show_long) {
-		r = R"(
-			(?:\s+)\K			# Start
-			--[[:alnum:]]+		# Long form starts with --
-			(?:-\w+)*			# Commands can have - in the middle, e.g. --names-only
-			(?![\w-])			# Has to end with a word character, e.g. --no- is not valid
-		)";
-	}
-
-	const boost::regex expr(r, boost::regex::no_mod_s | boost::regex::mod_x);
-	boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
-
-	set<string, iless> long_commands {};
-	for (auto mr = sr_iterator; mr != boost::sregex_iterator(); mr++) {
-		long_commands.insert(mr->str());
-		// cout << *mr << endl;
-	}
-
-	string delim {"\n"};
-	if (vm.count("delimiter")) {
-		delim = vm["delimiter"].as<string>();
-		// cout << "delim = " << delim << endl;
-	}
-
-	// Print set
-	// for (auto i : long_commands) {
-	for (auto i = long_commands.begin(); i != long_commands.end(); i++) {
-		if (std::next(i) == long_commands.end()) delim = "";
-		cout << *i << delim;
-	}
-	cout << endl;
+	set<string, iless> commands {get_commands(man_page)};
+	string delim = set_delimiter();
+	print_commands(commands, delim);
 
 	return 0;
 }
