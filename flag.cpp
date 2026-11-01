@@ -23,6 +23,7 @@ static Mode mode = Mode::Short;
 
 static bool is_sort = false;
 static bool is_reverse = false;
+static string version = "1.0.0";
 
 int set_program_options(int ac, char ** av) {
 	desc.add_options()
@@ -33,6 +34,7 @@ int set_program_options(int ac, char ** av) {
 		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "\"; \""), "Specify the delimiter used for separating flags, e.g. -d \"\\n\" or --delimiter=\"\\n\". The default delimiter is \"; \". The characters \"\\n\" and \"\\t\" retain special meaning, i.e. the new line and tab characters appropriately")
 		("sort,s", po::bool_switch(), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
 		("reverse,r", po::bool_switch(), "Reverse the sorting of the output")
+		("version,v", po::bool_switch(), "Display version information and exit")
 	;
 
 	po::parsed_options parsed = po::parse_command_line(ac, av, desc);
@@ -43,6 +45,11 @@ int set_program_options(int ac, char ** av) {
 		cout << desc << endl;
 		return 1;
 	}
+	else if (vm["version"].as<bool>()) {
+		cout << "flag " << version << endl;
+		return 1;
+	}
+
 	if (vm["reverse"].as<bool>()) {
 		is_reverse = true;
 	}
