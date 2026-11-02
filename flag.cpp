@@ -79,13 +79,10 @@ int set_program_options(int ac, char ** av) {
 }
 
 struct ilexic {
-	// Strip the fluff to compare only words and numbers
-	static string alnum_only(const string& s) {
-		string out;
-		for (unsigned char c : s)
-			if (std::isalnum(c)) out += c;
-
-		return out;
+	// Strip the dashes at the start to start comparing with alnum
+	static string strip_start(const string& s) {
+		auto it = find_if(s.begin(), s.end(), [](unsigned char c) { return isalnum(c); });
+		return string(it, s.end());
 	}
 
 	static string lower(string s) {
@@ -94,10 +91,10 @@ struct ilexic {
 	}
 
 	bool operator()(const string& a, const string& b) const {
-		string x = alnum_only(a);
-		string y = alnum_only(b);
-		if (is_reverse == true) return make_tuple(lower(y), y) < make_tuple(lower(x), x);
-		else return make_tuple(lower(x), x) < make_tuple(lower(y), y);
+		string x = strip_start(a);
+		string y = strip_start(b);
+		if (is_reverse == true) return make_tuple(lower(y), y, b) < make_tuple(lower(x), x, a);
+		else return make_tuple(lower(x), x, a) < make_tuple(lower(y), y, b);
 	}
 };
 
@@ -149,6 +146,7 @@ void print_sub_matches_debug(boost::smatch sm) {
 			cout << "s[" << i << "]: " << sm[i] << endl;
 		}
 	}
+	cout << endl;
 }
 
 template <typename A>
@@ -160,20 +158,36 @@ void add_commands(A & commands, string man_page, string regx) {
 		string command {};
 		auto sm = *mr;
 
-		if (is_debug) print_sub_matches_debug(sm);
+		if (is_debug) print_sub_matches_debug(sm); // DEBUG
 
-		if (sm[3].matched and sm[4].matched) { 		// [short|long] format
-			command = sm[3]+ ", " + sm[4];		
-		}
-		else if (sm[6].matched and sm[7].matched) {	// [long|short] -> [short|long] format
-			command = sm[7]+ ", " + sm[6];
-		}
-		else {
-			command = mr->str();
+		if (mode == Mode::Short) { 
+			if (sm[2].matched) {
+				command = sm[2] + sm[3];
+			}
+			else if (sm[4].matched) {
+				command = sm[4] + sm[5];
+			}
+			else continue;
+			
+			if (command.size() == 0) cout << "EMPTY: " << sm[0] << endl;
+			command = "[" + command + "]";
+		} else {
+			if (sm[3].matched and sm[4].matched) { 		// [short|long] format
+				command = sm[3]+ ", " + sm[4];		
+			}
+			else if (sm[6].matched and sm[7].matched) {	// [long|short] -> [short|long] format
+				command = sm[7]+ ", " + sm[6];
+			}
+			else {
+				command = mr->str();
+			}
 		}
 
-		if (is_reverse == false) commands.insert(commands.end(), command);
-		else commands.insert(commands.begin(), command);
+		bool found = find(commands.begin(), commands.end(), command) != commands.end();
+		if (!found) {
+			if (is_reverse == false) commands.insert(commands.end(), command);
+			else commands.insert(commands.begin(), command);
+		}
 	}
 }
 
@@ -182,19 +196,29 @@ void get_commands(A & commands, string man_page) {
 	string regx{};
 	if (mode == Mode::Short) {
 		regx = R"(
-			(?:^[ ]{3,6})\K				# Has to start with 3-6 spaces
-			-[[:alnum:]]+				# Short form starts with - followed my alnum, e.g. -a
-			(?=,|[[:space:]]{3,})		# Has to end with a , or 3 or more spaces
+			(?:^[\s]{3,6})\K				# Has to start with 3-6 \s
+
+											# CASE 1: [--[l-f], -[s-f]]
+			((?:(?:--\w+)					# (1) Long form starts with -- followed by alnum, e.g. --all
+				(?:-\w+)*					# The flag name can contain a dash in the middle, e.g. 
+											# --cert-type
+				(?:=\w+)?					# Long form can have an equal sign (=) followed by an option argument, e.g.
+											# --protocol=family
+				(?:[^-]{0,2}))				# Separation
+			(-\w+)(-\w+)*|					# (2, 3)
+											# ---
+											# CASE 2: [-[s-f], --[l-f]] and CASE 3: -[s-f]
+			(-\w+)(-\w+)*)					# (4, 5) Short form starts with - followed my alnum, e.g. -a
+											# ---
+			(?:[^-]{1,2})					# Has to end with 1 or 2 non - symbols
 		)";
 	}
 	else if (mode == Mode::Long) {
 		regx = R"(
-			(?:[[:space:]]{3,})\K
-			--[[:alnum:]]+(=\w+)?		# Long form starts with -- followed by alnum, e.g. --all
-										# Long form can have an equal sign (=) followed by an option argument, e.g.
-										# --protocol=family
-			(?:-\w+)*
-			(?=,|[[:space:]]{3,})
+			(?:^[\s]{3,6})\K
+			(--[[:alnum:]]+(=\w+)?)		
+			(?:-\w+)*					# Long form can have a dash inside of the flag name, e.g. --cert-type
+			(?=,\s|\s{3,})
 		)";
 	}
 	else if (mode == Mode::Mixed) {
