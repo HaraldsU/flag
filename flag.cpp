@@ -4,15 +4,19 @@
 #include <string>
 #include <variant>
 #include <tuple>
+#include <unistd.h>
 #include <stdio.h>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/regex.hpp>
 
 using namespace std;
 namespace po = boost::program_options;
 
 static po::options_description desc("Usage: flag [flags] arguments\nAllowed flags", 80);
+static po::options_description hidden("Hidden options");
+static po::options_description all;
 static po::variables_map vm;
 
 enum class Mode { Short, Long, Mixed};
@@ -21,38 +25,56 @@ static const std::unordered_map<std::string, Mode> kModes {
 	{"long",  Mode::Long},
 	{"mixed",  Mode::Mixed}
 };
-static Mode mode = Mode::Short;
+static Mode mode;
 
 static bool is_sort = false;
 static bool is_reverse = false;
 static bool is_debug = false;
 static string version = "1.0.0";
 
-int set_program_options(int ac, char ** av) {
+int set_program_options(int end, char ** av) {
 	desc.add_options()
-		("help,h", po::bool_switch(), "Show this help message")
+		("help,h", po::bool_switch()->default_value(false), "Show this help message")
+
 		// ("short,s", po::bool_switch(), "Show short flag notation, e.g. -h")
-		("long,l", po::bool_switch(), "Show long flag notation, e.g. --help (default is short form, e.g. -h)")
-		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. [-h|--help]")
-		("full,f", po::bool_switch(), "Show one explanatory line of the flag from the man page") // TO DO
-		("column,c", po::bool_switch(), "List entries by columns") // TO DO
+		("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. [--help] (default notation is short form, e.g. [-h])")
 
-		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("', '")->default_value(", ", ""), "Specify the delimiter used for separating flags, e.g. -d '\\n' or --delimiter='\\n'. The default delimiter is '; '. The characters '\\n' and '\\t' retain special meaning, i.e. the new line and tab characters appropriately")
+		("mixed,m", po::bool_switch()->default_value(true), "Show mixed flag notation, e.g. [-h|--help]")
 
-		("sort,s", po::bool_switch(), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
-		("title,t", po::bool_switch(), "Show the man page NAME section at the start of the output") // TO DO
-		("word-count,w", po::bool_switch(), "Show the printed flag count at the bottom of the output") // TO DO
-		("reverse,r", po::bool_switch(), "Reverse the sorting of the output")
-		("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'") // TO DO
-		("debug,D", po::bool_switch(), "Show debug messages") // TO DO
-		("version,v", po::bool_switch(), "Display version information and exit")
+		("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
+
+		("column,c", po::bool_switch()->default_value(false), "List entries by columns") // TO DO
+
+		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify DELIM used for separating flags; the characters '\\n' and '\\t' retain special meaning, i.e. new line and tab character respectively")
+
+		("sort,s", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
+		("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the start of the output") // TO DO
+		("word-count,w", po::bool_switch()->default_value(false), "Show the printed flag count at the bottom of the output") // TO DO
+		("reverse,r", po::bool_switch()->default_value(false), "Reverse the sorting of the output")
+
+		("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'")
+
+		("debug,D", po::bool_switch()->default_value(false), "Show debug messages")
+		("version,v", po::bool_switch()->default_value(false), "Display version information and exit")
 	;
 
-	po::parsed_options parsed = po::parse_command_line(ac, av, desc);
+	hidden.add_options()
+		("input", po::value<vector<string>>(), "input")
+		;
+
+	po::positional_options_description pos;
+	pos.add("input", -1);
+	all.add(desc).add(hidden);
+
+	po::parsed_options parsed = po::command_line_parser(end, av)
+		.options(all)
+		.positional(pos)
+		.run();
+
 	po::store(parsed, vm);
 	po::notify(vm); 
 
-	if (vm["help"].as<bool>() or ac < 2) {
+	if (vm["help"].as<bool>() or !vm.count("input")) {
 		cout << desc << endl;
 		return 1;
 	}
@@ -71,6 +93,7 @@ int set_program_options(int ac, char ** av) {
 		is_debug = true;
 	}
 
+	mode = Mode::Mixed;
 	for (const auto& opt : parsed.options) {
 		auto it = kModes.find(opt.string_key);
 		if (it != kModes.end())
@@ -101,8 +124,8 @@ struct ilexic {
 };
 
 string load_man_page(int ac, char ** av) {
-	string command{ "man "s + av[ac - 1] + " 2>/dev/null | "s + "cat"s};
-	// cout << "DEBUG: command = " << command << endl;
+	auto input = boost::algorithm::join(vm["input"].as<vector<string>>(), " ");
+	string command{ "man "s + input + " 2>/dev/null | "s + "cat"s};
 	
 	string man_page {};
 	auto po = popen(command.c_str(), "r");
@@ -224,7 +247,7 @@ void get_commands(A & commands, string man_page) {
 											# CASE 2: [-[s-f], --[l-f]] and CASE 3: -[s-f]
 			(-\w+)(-\w+)*)					# (4, 5) Short form starts with - followed my alnum, e.g. -a
 											# ---
-			(?:[^-\w\n]{1,2})					# Has to end with 1 or 2 non - symbols
+			(?:$|[^-\w\n]{3,})				# END
 		)";
 	}
 	else if (mode == Mode::Long) {
@@ -240,7 +263,7 @@ void get_commands(A & commands, string man_page) {
 											# CASE 2: [--[l-f], -[s-f]] and CASE 3: --[l-f]
 			(--\w+)(-\w+)*(=\w+)?)			# (5, 6, 7)
 
-			(?:[^-\w\n]{1,2})
+			(?:$|[^-\w\n]{3,})				# END
 		)";
 	}
 	else if (mode == Mode::Mixed) {
@@ -271,7 +294,7 @@ void get_commands(A & commands, string man_page) {
 				((--\w+)(-\w+)*(=\w+)?)			# (21, 22, 23, 24)
 			)									
 
-			(?:[^-\w\n]{1,2})					# END
+			(?:$|[^-\w\n]{3,})					# END
 		)";
 	}
 
@@ -286,19 +309,31 @@ void print_commands(A commands, string delim) {
 
 		string output {};
 		if (mode == Mode::Mixed) {
+			int pipe_pos = 0;
+			int i = 0;
 			for (auto c : *iter) {
 				if (c != ',') {
 					output.append(std::string{c});
+					i++;
 				}
 				else {
-					output.append("\033[33m|\033[32m");
+					output.append("|");
+					pipe_pos = i;
 				}
 			}
-			output.insert(output.length() - 1, "\033[33m");
-			output.insert(1, "\033[31m");
-			output.insert(0, "\033[33m");
-			output.insert(0, "\033[0m");
-			output += "\033[0m";
+
+			auto when = vm["color"].as<string>();
+			if ( when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) {
+				if (pipe_pos != 0) {
+					output.insert(pipe_pos + 1, "\033[32m");
+					output.insert(pipe_pos, "\033[33m");
+				}
+				output.insert(output.length() - 1, "\033[33m");
+				output.insert(1, "\033[31m");
+				output.insert(0, "\033[33m");
+				output.insert(0, "\033[0m");
+				output += "\033[0m";
+			}
 		}
 		else {
 			output = *iter;
@@ -308,8 +343,15 @@ void print_commands(A commands, string delim) {
 	cout << endl;
 }
 
+int get_command_end_idx(int ac, char ** av) {
+	int n = ac - 1;
+	while (n > 0 && av[n][0] == '-') n--;
+	return n > 0 ? n + 1 : ac;
+}
+
 int main(int ac, char ** av) {
-	auto spo = set_program_options(ac, av);
+	auto end = get_command_end_idx(ac, av);
+	auto spo = set_program_options(end, av);
 	if (spo == 1) return 1;
 
 	string man_page {};
