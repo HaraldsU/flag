@@ -36,12 +36,14 @@ int set_program_options(int ac, char ** av) {
 		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. [-h|--help]")
 		("full,f", po::bool_switch(), "Show one explanatory line of the flag from the man page") // TO DO
 		("column,c", po::bool_switch(), "List entries by columns") // TO DO
-		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("'; '")->default_value("; ", ""), "Specify the delimiter used for separating flags, e.g. -d '\\n' or --delimiter='\\n'. The default delimiter is '; '. The characters '\\n' and '\\t' retain special meaning, i.e. the new line and tab characters appropriately")
+
+		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("', '")->default_value(", ", ""), "Specify the delimiter used for separating flags, e.g. -d '\\n' or --delimiter='\\n'. The default delimiter is '; '. The characters '\\n' and '\\t' retain special meaning, i.e. the new line and tab characters appropriately")
+
 		("sort,s", po::bool_switch(), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
 		("title,t", po::bool_switch(), "Show the man page NAME section at the start of the output") // TO DO
 		("word-count,w", po::bool_switch(), "Show the printed flag count at the bottom of the output") // TO DO
 		("reverse,r", po::bool_switch(), "Reverse the sorting of the output")
-		("color", po::value<string>()->value_name("WHEN")->implicit_value("never"), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'") // TO DO
+		("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'") // TO DO
 		("debug,D", po::bool_switch(), "Show debug messages") // TO DO
 		("version,v", po::bool_switch(), "Display version information and exit")
 	;
@@ -115,12 +117,10 @@ string load_man_page(int ac, char ** av) {
 }
 
 string set_delimiter() {
-	string delim {"; "};
-	if (vm.count("delimiter")) {
-		delim = vm["delimiter"].as<string>();
-		if (delim == "\\n") delim = "\n";
-		else if (delim == "\\t") delim = "\t";
-	}
+	string delim {vm["delimiter"].as<string>()};
+	delim = vm["delimiter"].as<string>();
+	if (delim == "\\n") delim = "\n";
+	else if (delim == "\\t") delim = "\t";
 
 	return delim;
 }
@@ -218,13 +218,13 @@ void get_commands(A & commands, string man_page) {
 											# --cert-type
 				(?:=\w+)?					# Long form can have an equal sign (=) followed by an option argument, e.g.
 											# --protocol=family
-				(?:[^-\w]{1,2}))			# Separation
+				(?:[^-\w\n]{1,2}))			# Separation
 			(-\w+)(-\w+)*|					# (2, 3)
 											# --|--
 											# CASE 2: [-[s-f], --[l-f]] and CASE 3: -[s-f]
 			(-\w+)(-\w+)*)					# (4, 5) Short form starts with - followed my alnum, e.g. -a
 											# ---
-			(?:[^-\w]{1,2})					# Has to end with 1 or 2 non - symbols
+			(?:[^-\w\n]{1,2})					# Has to end with 1 or 2 non - symbols
 		)";
 	}
 	else if (mode == Mode::Long) {
@@ -234,13 +234,13 @@ void get_commands(A & commands, string man_page) {
 											# CASE 1: [-[s-f], --[l-f]]
 			((?:(?:-\w+)					# (1)
 				(?:-\w+)*
-				(?:[^-\w]{1,2}))
+				(?:[^-\w\n]{1,2}))
 			(--\w+)(-\w+)*(=\w+)?|			# (2, 3, 4)
 											# --|--
 											# CASE 2: [--[l-f], -[s-f]] and CASE 3: --[l-f]
 			(--\w+)(-\w+)*(=\w+)?)			# (5, 6, 7)
 
-			(?:[^-\w]{1,2})
+			(?:[^-\w\n]{1,2})
 		)";
 	}
 	else if (mode == Mode::Mixed) {
@@ -251,7 +251,7 @@ void get_commands(A & commands, string man_page) {
 				# CASE 1: [-[s-f], --[l-f]]
 				(((-\w+)						# (2, 3, 4)
 					(-\w+)*)					# (5)
-					(?:[^-\w]{1,2})
+					(?:[^-\w\n]{1,2})
 				((--\w+)						# (6, 7)
 					(-\w+)*						# (8)
 					(=\w+)?))|					# (9)
@@ -260,7 +260,7 @@ void get_commands(A & commands, string man_page) {
 				(((--\w+)						# (10, 11, 12)
 					(-\w+)*						# (13)
 					(=\w+)?)					# (14)
-					(?:[^-\w]{1,2})
+					(?:[^-\w\n]{1,2})
 				((-\w+)							# (15, 16)
 					(-\w+)*))|					# (17)
 
@@ -271,7 +271,7 @@ void get_commands(A & commands, string man_page) {
 				((--\w+)(-\w+)*(=\w+)?)			# (21, 22, 23, 24)
 			)									
 
-			(?:[^-]{1,2})						# END
+			(?:[^-\w\n]{1,2})					# END
 		)";
 	}
 
@@ -280,22 +280,30 @@ void get_commands(A & commands, string man_page) {
 
 template <typename A>
 void print_commands(A commands, string delim) {
-	for (auto i = commands.begin(); i != commands.end(); i++) {
-		if (std::next(i) == commands.end()) delim = "";
+	// cout << "delim = " << delim;
+	for (auto iter = commands.begin(); iter != commands.end(); iter++) {
+		if (std::next(iter) == commands.end()) delim = "";
+
+		string output {};
 		if (mode == Mode::Mixed) {
-			string output {};
-			// cout << *i << endl;
-			for (auto c : *i) {
-				if (c != ',') { 
+			for (auto c : *iter) {
+				if (c != ',') {
 					output.append(std::string{c});
 				}
-				else { 
-					output.append("|"); 
+				else {
+					output.append("\033[33m|\033[32m");
 				}
 			}
-			cout << output << delim;
+			output.insert(output.length() - 1, "\033[33m");
+			output.insert(1, "\033[31m");
+			output.insert(0, "\033[33m");
+			output.insert(0, "\033[0m");
+			output += "\033[0m";
 		}
-		else cout << *i << delim; // Short and long mode
+		else {
+			output = *iter;
+		}
+		cout << output << delim;
 	}
 	cout << endl;
 }
