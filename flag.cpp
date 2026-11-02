@@ -1,7 +1,9 @@
 #include <iostream>
+#include <ios>
 #include <set>
 #include <string>
 #include <variant>
+#include <tuple>
 #include <stdio.h>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -10,7 +12,7 @@
 using namespace std;
 namespace po = boost::program_options;
 
-static po::options_description desc("Usage: flag [flags] arguments\nAllowed flags", 120);
+static po::options_description desc("Usage: flag [flags] arguments\nAllowed flags", 80);
 static po::variables_map vm;
 
 enum class Mode { Short, Long, Mixed};
@@ -23,6 +25,7 @@ static Mode mode = Mode::Short;
 
 static bool is_sort = false;
 static bool is_reverse = false;
+static bool is_debug = false;
 static string version = "1.0.0";
 
 int set_program_options(int ac, char ** av) {
@@ -33,7 +36,7 @@ int set_program_options(int ac, char ** av) {
 		("mixed,m", po::bool_switch(), "Show mixed flag notation, e.g. [-h|--help]")
 		("full,f", po::bool_switch(), "Show one explanatory line of the flag from the man page") // TO DO
 		("column,c", po::bool_switch(), "List entries by columns") // TO DO
-		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("; ", "'; '"), "Specify the delimiter used for separating flags, e.g. -d '\\n' or --delimiter='\\n'. The default delimiter is '; '. The characters '\\n' and '\\t' retain special meaning, i.e. the new line and tab characters appropriately")
+		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("'; '")->default_value("; ", ""), "Specify the delimiter used for separating flags, e.g. -d '\\n' or --delimiter='\\n'. The default delimiter is '; '. The characters '\\n' and '\\t' retain special meaning, i.e. the new line and tab characters appropriately")
 		("sort,s", po::bool_switch(), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
 		("title,t", po::bool_switch(), "Show the man page NAME section at the start of the output") // TO DO
 		("word-count,w", po::bool_switch(), "Show the printed flag count at the bottom of the output") // TO DO
@@ -62,6 +65,9 @@ int set_program_options(int ac, char ** av) {
 	if (vm["sort"].as<bool>()) {
 		is_sort = true;
 	}
+	if (vm["debug"].as<bool>()) {
+		is_debug = true;
+	}
 
 	for (const auto& opt : parsed.options) {
 		auto it = kModes.find(opt.string_key);
@@ -82,9 +88,16 @@ struct ilexic {
 		return out;
 	}
 
+	static string lower(string s) {
+		for (auto & c : s) c = tolower(static_cast<unsigned char>(c));
+		return s;
+	}
+
 	bool operator()(const string& a, const string& b) const {
-		if (is_reverse == true) return boost::algorithm::ilexicographical_compare(alnum_only(b), alnum_only(a));
-		else return boost::algorithm::ilexicographical_compare(alnum_only(a), alnum_only(b));
+		string x = alnum_only(a);
+		string y = alnum_only(b);
+		if (is_reverse == true) return make_tuple(lower(y), y) < make_tuple(lower(x), x);
+		else return make_tuple(lower(x), x) < make_tuple(lower(y), y);
 	}
 };
 
@@ -115,19 +128,45 @@ string set_delimiter() {
 	return delim;
 }
 
+// DEBUGGING
+void print_debug() {
+	cout << "DEBUG:" << endl;
+	auto m = int(mode) == 0 ? "short"
+		: int(mode) == 1 ? "long"
+		: "mixed";
+	cout << "Mode: " << int(mode) << " (" << m << ")" << endl;
+	cout << "Delimiter: " << "'" << vm["delimiter"].as<string>() << "'" << endl;
+	cout << "Sort: " << boolalpha << is_sort << endl;
+	cout << "Reverse: " << is_reverse << endl;
+	cout << "Debug: " << is_debug << endl;
+	cout << "Version: " << version << endl;
+	cout << endl;
+}
+
+void print_sub_matches_debug(boost::smatch sm) {
+	for (std::size_t i = 0; i < sm.size(); i++) {
+		if (sm[i].matched) {
+			cout << "s[" << i << "]: " << sm[i] << endl;
+		}
+	}
+}
+
 template <typename A>
 void add_commands(A & commands, string man_page, string regx) {
 	const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
 	boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
-	string command {};
 
 	for (auto mr = sr_iterator; mr != boost::sregex_iterator(); mr++) {
-		auto smatch = *mr;
-		if (smatch[3].matched and smatch[4].matched) { 		// [short|long] format
-			command = smatch[3]+ ", " + smatch[4];		
+		string command {};
+		auto sm = *mr;
+
+		if (is_debug) print_sub_matches_debug(sm);
+
+		if (sm[3].matched and sm[4].matched) { 		// [short|long] format
+			command = sm[3]+ ", " + sm[4];		
 		}
-		else if (smatch[6].matched and smatch[7].matched) {	// [long|short] -> [short|long] format
-			command = smatch[7]+ ", " + smatch[6];
+		else if (sm[6].matched and sm[7].matched) {	// [long|short] -> [short|long] format
+			command = sm[7]+ ", " + sm[6];
 		}
 		else {
 			command = mr->str();
@@ -143,9 +182,8 @@ void get_commands(A & commands, string man_page) {
 	string regx{};
 	if (mode == Mode::Short) {
 		regx = R"(
-			(?:[[:space:]]{3,})\K		# Has to start with 3 or more spaces
+			(?:^[ ]{3,6})\K				# Has to start with 3-6 spaces
 			-[[:alnum:]]+				# Short form starts with - followed my alnum, e.g. -a
-			(?:-\w+)*					# Commands can have - in the middle followed by alnum, e.g. -names-only
 			(?=,|[[:space:]]{3,})		# Has to end with a , or 3 or more spaces
 		)";
 	}
@@ -203,6 +241,8 @@ int main(int ac, char ** av) {
 
 	string man_page {};
 	try {
+		if (is_debug) print_debug();
+
 		man_page = load_man_page(ac, av);
 		variant<set<string, ilexic>, vector<string>> commands;
 		if (is_sort == true) commands = set<string, ilexic>{};
