@@ -1,15 +1,15 @@
-#include <iostream>
 #include <ios>
 #include <set>
+#include <tuple>
 #include <string>
 #include <variant>
-#include <tuple>
-#include <unistd.h>
 #include <stdio.h>
-#include <boost/program_options.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/join.hpp>
+#include <unistd.h>
+#include <iostream>
 #include <boost/regex.hpp>
+#include <boost/program_options.hpp>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
 using namespace std;
 namespace po = boost::program_options;
@@ -32,11 +32,38 @@ static bool is_reverse = false;
 static bool is_debug = false;
 static string version = "1.0.0";
 
+
+// DEBUGGING
+void print_debug() {
+	cout << "DEBUG:" << endl;
+	auto m = int(mode) == 0 ? "short"
+		: int(mode) == 1 ? "long"
+		: "mixed";
+	cout << "Mode: " << int(mode) << " (" << m << ")" << endl;
+	cout << "Delimiter: " << "'" << vm["delimiter"].as<string>() << "'" << endl;
+	cout << "Sort: " << boolalpha << is_sort << endl;
+	cout << "Reverse: " << is_reverse << endl;
+	cout << "Debug: " << is_debug << endl;
+	cout << "Version: " << version << endl;
+	cout << endl;
+}
+
+void print_sub_matches_debug(boost::smatch sm) {
+	for (std::size_t i = 0; i < sm.size(); i++) {
+		if (sm[i].matched) {
+			cout << "s[" << i << "]: " << sm[i] << endl;
+		}
+	}
+	cout << endl;
+}
+// DEBUGGING
+
+
 int set_program_options(int end, char ** av) {
 	desc.add_options()
 		("help,h", po::bool_switch()->default_value(false), "Show this help message")
 
-		// ("short,s", po::bool_switch(), "Show short flag notation, e.g. -h")
+		("short,s", po::bool_switch()->default_value(false), "Show short flag notation, e.g. [-h]")
 		("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. [--help] (default notation is short form, e.g. [-h])")
 
 		("mixed,m", po::bool_switch()->default_value(true), "Show mixed flag notation, e.g. [-h|--help]")
@@ -47,7 +74,7 @@ int set_program_options(int end, char ** av) {
 
 		("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify DELIM used for separating flags; the characters '\\n' and '\\t' retain special meaning, i.e. new line and tab character respectively")
 
-		("sort,s", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
+		("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
 		("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the start of the output") // TO DO
 		("word-count,w", po::bool_switch()->default_value(false), "Show the printed flag count at the bottom of the output") // TO DO
 		("reverse,r", po::bool_switch()->default_value(false), "Reverse the sorting of the output")
@@ -146,30 +173,6 @@ string set_delimiter() {
 	else if (delim == "\\t") delim = "\t";
 
 	return delim;
-}
-
-// DEBUGGING
-void print_debug() {
-	cout << "DEBUG:" << endl;
-	auto m = int(mode) == 0 ? "short"
-		: int(mode) == 1 ? "long"
-		: "mixed";
-	cout << "Mode: " << int(mode) << " (" << m << ")" << endl;
-	cout << "Delimiter: " << "'" << vm["delimiter"].as<string>() << "'" << endl;
-	cout << "Sort: " << boolalpha << is_sort << endl;
-	cout << "Reverse: " << is_reverse << endl;
-	cout << "Debug: " << is_debug << endl;
-	cout << "Version: " << version << endl;
-	cout << endl;
-}
-
-void print_sub_matches_debug(boost::smatch sm) {
-	for (std::size_t i = 0; i < sm.size(); i++) {
-		if (sm[i].matched) {
-			cout << "s[" << i << "]: " << sm[i] << endl;
-		}
-	}
-	cout << endl;
 }
 
 template <typename A>
