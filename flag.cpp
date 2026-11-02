@@ -168,20 +168,34 @@ void add_commands(A & commands, string man_page, string regx) {
 				command = sm[4] + sm[5];
 			}
 			else continue;
-			
-			if (command.size() == 0) cout << "EMPTY: " << sm[0] << endl;
-			command = "[" + command + "]";
-		} else {
-			if (sm[3].matched and sm[4].matched) { 		// [short|long] format
-				command = sm[3]+ ", " + sm[4];		
-			}
-			else if (sm[6].matched and sm[7].matched) {	// [long|short] -> [short|long] format
-				command = sm[7]+ ", " + sm[6];
-			}
-			else {
-				command = mr->str();
-			}
 		}
+		else if (mode == Mode::Long) {
+			if (sm[2].matched) {
+				command = sm[2] + sm[3] + sm[4];
+			}
+			else if (sm[5].matched) {
+				command = sm[5] + sm[6] + sm[7];
+			}
+			else continue;
+		} else {
+			if (sm[2].matched) {
+				command = sm[3] + "," + sm[6];
+			}
+			else if (sm[10].matched) {
+				command = sm[15] + "," + sm[11];
+			}
+			else if (sm[18].matched) {
+				command = sm[18];
+			}
+			else if (sm[21].matched) {
+				command = sm[21];
+			}
+			else continue;
+		}
+
+		if (command.size() == 0) cout << "EMPTY: " << sm[0] << endl;
+		command = "[" + command + "]";
+		// cout << "command: " << command << endl;
 
 		bool found = find(commands.begin(), commands.end(), command) != commands.end();
 		if (!found) {
@@ -204,32 +218,60 @@ void get_commands(A & commands, string man_page) {
 											# --cert-type
 				(?:=\w+)?					# Long form can have an equal sign (=) followed by an option argument, e.g.
 											# --protocol=family
-				(?:[^-]{0,2}))				# Separation
+				(?:[^-\w]{1,2}))			# Separation
 			(-\w+)(-\w+)*|					# (2, 3)
-											# ---
+											# --|--
 											# CASE 2: [-[s-f], --[l-f]] and CASE 3: -[s-f]
 			(-\w+)(-\w+)*)					# (4, 5) Short form starts with - followed my alnum, e.g. -a
 											# ---
-			(?:[^-]{1,2})					# Has to end with 1 or 2 non - symbols
+			(?:[^-\w]{1,2})					# Has to end with 1 or 2 non - symbols
 		)";
 	}
 	else if (mode == Mode::Long) {
 		regx = R"(
 			(?:^[\s]{3,6})\K
-			(--[[:alnum:]]+(=\w+)?)		
-			(?:-\w+)*					# Long form can have a dash inside of the flag name, e.g. --cert-type
-			(?=,\s|\s{3,})
+
+											# CASE 1: [-[s-f], --[l-f]]
+			((?:(?:-\w+)					# (1)
+				(?:-\w+)*
+				(?:[^-\w]{1,2}))
+			(--\w+)(-\w+)*(=\w+)?|			# (2, 3, 4)
+											# --|--
+											# CASE 2: [--[l-f], -[s-f]] and CASE 3: --[l-f]
+			(--\w+)(-\w+)*(=\w+)?)			# (5, 6, 7)
+
+			(?:[^-\w]{1,2})
 		)";
 	}
 	else if (mode == Mode::Mixed) {
 		regx = R"(
-			(?:[[:space:]]{3,})\K
-			(((-[[:alnum:]]+),[[:space:]](--[[:alnum:]]+(?:=\w+)?))| 	# (1, 2, 3, 4) Short form followed by long form, e.g. -a, --all
-			((--[[:alnum:]]+(?:=\w+)?),[[:space:]](-[[:alnum:]]+))|		# (5, 6, 7) Long form followed by short form, e.g. --all, -a
-			(-[[:alnum:]]+)|											# (8) Short form
-			(--[[:alnum:]]+(=\w+)?))									# (9) Long form
-			(?:-\w+)*
-			(?=,|[[:space:]]{3,})
+			(?:^[\s]{3,6})\K					# START
+
+			(									# (1)
+				# CASE 1: [-[s-f], --[l-f]]
+				(((-\w+)						# (2, 3, 4)
+					(-\w+)*)					# (5)
+					(?:[^-\w]{1,2})
+				((--\w+)						# (6, 7)
+					(-\w+)*						# (8)
+					(=\w+)?))|					# (9)
+
+				# CASE 2: [--[l-f], -[s-f]]
+				(((--\w+)						# (10, 11, 12)
+					(-\w+)*						# (13)
+					(=\w+)?)					# (14)
+					(?:[^-\w]{1,2})
+				((-\w+)							# (15, 16)
+					(-\w+)*))|					# (17)
+
+				# CASE 3: only -[s-f]
+				((-\w+)(-\w+)*)|				# (18, 19, 20)
+
+				# CASE 4: only --[l-f]
+				((--\w+)(-\w+)*(=\w+)?)			# (21, 22, 23, 24)
+			)									
+
+			(?:[^-]{1,2})						# END
 		)";
 	}
 
@@ -242,16 +284,15 @@ void print_commands(A commands, string delim) {
 		if (std::next(i) == commands.end()) delim = "";
 		if (mode == Mode::Mixed) {
 			string output {};
+			// cout << *i << endl;
 			for (auto c : *i) {
-				if (c != ',' and c != ' ') { 
+				if (c != ',') { 
 					output.append(std::string{c});
 				}
-				else if (c != ' ') { 
+				else { 
 					output.append("|"); 
 				}
 			}
-			output = "[" + output;
-			output.append("]"); 
 			cout << output << delim;
 		}
 		else cout << *i << delim; // Short and long mode
