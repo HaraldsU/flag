@@ -21,10 +21,11 @@ static po::options_description all;
 static po::variables_map vm;
 
 enum class Mode { Short, Long, Mixed};
-static const std::unordered_map<std::string, Mode> kModes {
+static const unordered_map<string, Mode> kModes {
     {"short", Mode::Short},
     {"long",  Mode::Long},
-    {"mixed",  Mode::Mixed}
+    {"mixed",  Mode::Mixed},
+    {"mixed-only",  Mode::Mixed}
 };
 static Mode mode;
 
@@ -33,8 +34,22 @@ static bool is_reverse    = false;
 static bool is_debug      = false;
 static bool is_word_count = false;
 static bool is_title      = false;
+static bool is_mixed_only = false;
 static string version     = "1.0.0";
 
+
+string escape(const string& s) {
+    string out;
+    for (char c : s) {
+        switch (c) {
+            case '\n': out += "\\n";  break;
+            case '\t': out += "\\t";  break;
+            case '\\': out += "\\\\"; break;
+            default:   out += c;
+        }
+    }
+    return out;
+}
 
 // DEBUGGING
 void print_debug() {
@@ -43,17 +58,18 @@ void print_debug() {
         : int(mode) == 1 ? "long"
         : "mixed";
 
-    cout << "Mode: "      << int(mode)  << " (" << m << ")" << endl;
-    cout << "Delimiter: " << "'"        << vm["delimiter"].as<string>() << "'" << endl;
-    cout << "Sort: "      << boolalpha  << is_sort << endl;
-    cout << "Reverse: "   << is_reverse << endl;
-    cout << "Debug: "     << is_debug   << endl;
-    cout << "Version: "   << version    << endl;
+    cout << "Mode: "       << int(mode)  << " (" << m << ")" << endl;
+    cout << "Mixed-only: " << boolalpha  << is_mixed_only << endl;
+    cout << "Delimiter: "  << "'"        << escape(vm["delimiter"].as<string>()) << "'" << endl;
+    cout << "Sort: "       << boolalpha  << is_sort << endl;
+    cout << "Reverse: "    << is_reverse << endl;
+    cout << "Debug: "      << is_debug   << endl;
+    cout << "Version: "    << version    << endl;
     cout << endl;
 }
 
 void print_sub_matches_debug(boost::smatch sm) {
-    for (std::size_t i = 0; i < sm.size(); i++) {
+    for (size_t i = 0; i < sm.size(); i++) {
         if (sm[i].matched) {
             cout << "s[" << i << "]: " << sm[i] << endl;
         }
@@ -72,6 +88,8 @@ int set_program_options(int end, char ** av) {
         ("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. [--help] (default notation is short form, e.g. [-h])")
 
         ("mixed,m", po::bool_switch()->default_value(true), "Show mixed flag notation, e.g. [-h|--help]")
+
+        ("mixed-only,M", po::bool_switch()->default_value(false), "Show only flags that have both short and long notations")
 
         ("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
 
@@ -128,6 +146,9 @@ int set_program_options(int end, char ** av) {
     if (vm["word-count"].as<bool>()) {
         is_word_count = true;
     }
+    if (vm["mixed-only"].as<bool>()) {
+        is_mixed_only = true;
+    }
     if (vm["title"].as<bool>()) {
         is_title = true;
     }
@@ -177,7 +198,7 @@ string load_man_page(int ac, char ** av) {
     }
     pclose(po);
 
-    if (man_page.size() == 0) throw std::string{"Man page for command \"" + std::string{av[ac -1]} + "\" not found"};
+    if (man_page.size() == 0) throw string{"Man page for command \"" + string{av[ac -1]} + "\" not found"};
     else return man_page;
 }
 
@@ -225,7 +246,7 @@ void add_commands(A & commands, string man_page, string regx) {
                 flag_count[Mode::Long]++;
             }
             else continue;
-        } else {
+        } else if (mode == Mode::Mixed) {
             if (sm[2].matched) {
                 command = sm[3] + "," + sm[6];
                 flag_count[Mode::Mixed]++;
@@ -234,15 +255,20 @@ void add_commands(A & commands, string man_page, string regx) {
                 command = sm[15] + "," + sm[11];
                 flag_count[Mode::Mixed]++;
             }
-            else if (sm[18].matched) {
-                command = sm[18];
-                flag_count[Mode::Short]++;
-            }
-            else if (sm[21].matched) {
-                command = sm[21];
-                flag_count[Mode::Long]++;
+            else if (!is_mixed_only) {
+                if (sm[18].matched) {
+                    command = sm[18];
+                    flag_count[Mode::Short]++;
+                }
+                else if (sm[21].matched) {
+                    command = sm[21];
+                    flag_count[Mode::Long]++;
+                }
+                else continue;
             }
             else continue;
+        } else {
+            throw string{"Invalid flag notation (expected short, long or mixed)"};
         }
         command = "[" + command + "]";
 
@@ -362,19 +388,26 @@ void get_commands(A & commands, string man_page) {
             reg_end
         ;
     } else {
-        throw "Invalid flag notation (expected short, long or mixed)";
+        throw string{"Invalid flag notation (expected short, long or mixed)"};
     }
 
     // cout << "reg_final: " << reg_final << endl;
-    add_commands(commands, man_page, reg_final);
+    try {
+        add_commands(commands, man_page, reg_final);
+        if (commands.size() == 0) {
+            throw string{"No flags found (try flag -m)"};
+        }
+    } catch (const string & e) {
+        throw e;
+    }
 }
 
 template <typename A>
 vector<string> get_n_longest_flags(const A commands) {
     int n = vm["column"].as<int>();
     vector<string> sorted(commands.begin(), commands.end());
-    std::sort(sorted.begin(), sorted.end(),
-        [](const std::string& a, const std::string& b) {
+    sort(sorted.begin(), sorted.end(),
+        [](const string& a, const string& b) {
             return a.size() > b.size();
         }
     );
@@ -436,7 +469,7 @@ void print_commands_helper(A commands, string delim, int longest_flag_n) {
 			int i = 0;
 			for (auto c : *iter) {
 				if (c != ',') {
-					output.append(std::string{c});
+					output.append(string{c});
 					i++;
 				}
 				else {
@@ -514,7 +547,7 @@ int main(int ac, char ** av) {
         visit([&](auto & c) { print_commands(c, delim, man_page); }, commands);
 
         return 0;
-    } catch (const string& e) {
+    } catch (const string & e) {
         cout << e << endl;
         return 1;
     }
