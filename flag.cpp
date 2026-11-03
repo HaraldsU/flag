@@ -14,8 +14,8 @@
 using namespace std;
 namespace po = boost::program_options;
 
-const static int kColumn_width = 80;
-static po::options_description desc("Usage: flag [flags] arguments\nAllowed flags", kColumn_width);
+const static int kColumn_width = 100;
+static po::options_description desc("Usage: flag [flags] argument\nAllowed flags", kColumn_width);
 static po::options_description hidden("Hidden options");
 static po::options_description all;
 static po::variables_map vm;
@@ -35,6 +35,7 @@ static bool is_debug      = false;
 static bool is_word_count = false;
 static bool is_title      = false;
 static bool is_mixed_only = false;
+static int enclose_count  = 2;
 static string version     = "1.0.0";
 
 
@@ -85,7 +86,7 @@ int set_program_options(int end, char ** av) {
 
         ("short,s", po::bool_switch()->default_value(false), "Show short flag notation, e.g. [-h]")
 
-        ("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. [--help] (default notation is short form, e.g. [-h])")
+        ("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. [--help]")
 
         ("mixed,m", po::bool_switch()->default_value(true), "Show mixed flag notation, e.g. [-h|--help]")
 
@@ -93,15 +94,17 @@ int set_program_options(int end, char ** av) {
 
         ("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
 
-        ("column,c", po::value<int>()->implicit_value(1)->default_value(1, ""), "List entries by columns") // TO DO
+        ("column,c", po::value<int>()->value_name("COL")->implicit_value(1)->default_value(1, ""), "List entries by columns; COL specifies the column count")
 
-        ("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify DELIM used for separating flags; the characters '\\n' and '\\t' retain special meaning, i.e. new line and tab character respectively")
+        ("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify DELIM used for separating flags; the characters '\\n' and '\\t' retain special meaning")
 
-        ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
+        ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), "Specify ENC used for 'enclosing' the flag output (prepending and appending); 1 or 2 arguments are expected, e.g. -e '|' or --enclose='<>'")
 
-        ("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the start of the output")
+        ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default flag are sorted by the order of appearance)")
 
-        ("word-count,w", po::bool_switch()->default_value(false), "Show the printed flag count at the bottom of the output")
+        ("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the top and bottom of the output")
+
+        ("word-count,w", po::bool_switch()->default_value(false), "Show the printed flag count at the top and bottom of the output")
 
         ("reverse,r", po::bool_switch()->default_value(false), "Reverse the sorting of the output")
 
@@ -120,50 +123,57 @@ int set_program_options(int end, char ** av) {
     pos.add("input", -1);
     all.add(desc).add(hidden);
 
-    po::parsed_options parsed = po::command_line_parser(end, av)
-        .options(all)
-        .positional(pos)
-        .run();
+    try {
+        po::parsed_options parsed = po::command_line_parser(end, av)
+            .options(all)
+            .positional(pos)
+            .run();
+        po::store(parsed, vm);
+        po::notify(vm); 
 
-    po::store(parsed, vm);
-    po::notify(vm); 
+        if (vm["help"].as<bool>() or !vm.count("input")) {
+            cout << desc << endl;
+            return 1;
+        }
+        else if (vm["version"].as<bool>()) {
+            cout << "flag " << version << endl;
+            return 1;
+        }
 
-    if (vm["help"].as<bool>() or !vm.count("input")) {
-        cout << desc << endl;
-        return 1;
-    }
-    else if (vm["version"].as<bool>()) {
-        cout << "flag " << version << endl;
-        return 1;
-    }
+        if (vm["reverse"].as<bool>()) is_reverse = true;
+        if (vm["sort"].as<bool>()) is_sort = true;
+        if (vm["word-count"].as<bool>()) is_word_count = true;
+        if (vm["mixed-only"].as<bool>()) is_mixed_only = true;
+        if (vm["title"].as<bool>()) is_title = true;
+        if (vm["debug"].as<bool>()) is_debug = true;
 
-    if (vm["reverse"].as<bool>()) {
-        is_reverse = true;
-    }
-    if (vm["sort"].as<bool>()) {
-        is_sort = true;
-    }
-    if (vm["word-count"].as<bool>()) {
-        is_word_count = true;
-    }
-    if (vm["mixed-only"].as<bool>()) {
-        is_mixed_only = true;
-    }
-    if (vm["title"].as<bool>()) {
-        is_title = true;
-    }
-    if (vm["debug"].as<bool>()) {
-        is_debug = true;
-    }
+        if (vm.count("enclose")) {
+            if (vm["enclose"].as<string>().length() == 0) enclose_count = 0;
+            else if (vm["enclose"].as<string>().length() == 1) enclose_count = 1;
+            else if (vm["enclose"].as<string>().length() == 2) enclose_count = 2;
+            else throw string{"Enclose accepts 1 or 2 characters (default is none)"};
+        }
 
-    mode = Mode::Mixed;
-    for (const auto& opt : parsed.options) {
-        auto it = kModes.find(opt.string_key);
-        if (it != kModes.end())
-            mode = it->second;
-    }
+        mode = Mode::Mixed;
+        for (const auto& opt : parsed.options) {
+            auto it = kModes.find(opt.string_key);
+            if (it != kModes.end())
+                mode = it->second;
+        }
 
-    return 0;
+        return 0;
+    } catch (const po::invalid_command_line_syntax& e) {
+        if (e.kind() == po::invalid_command_line_syntax::empty_adjacent_parameter) {
+            string opt = e.get_option_name();
+            if (opt == "--enclose") {
+                throw string{"Empty value for " + e.get_option_name() + "=, use --enclose '' instead"};
+            } else if (opt == "--delimiter") {
+                throw string{"Empty value for " + e.get_option_name() + "=, use --delimiter '' instead"};
+            }
+        }
+
+        throw string{"Flag: unknown error occured"};
+    }
 }
 
 struct ilexic {
@@ -270,7 +280,7 @@ void add_commands(A & commands, string man_page, string regx) {
         } else {
             throw string{"Invalid flag notation (expected short, long or mixed)"};
         }
-        command = "[" + command + "]";
+        // command = "[" + command + "]";
 
         bool found = find(commands.begin(), commands.end(), command) != commands.end();
         if (!found) {
@@ -444,30 +454,55 @@ void print_title(string man_page) {
 }
 
 void add_colors(string & output, int pipe_pos) {
+    // 31: red; 32: green; 33: yellow
     if (pipe_pos != 0) {
         output.insert(pipe_pos + 1, "\033[32m");
         output.insert(pipe_pos, "\033[33m");
     }
-    output.insert(output.length() - 1, "\033[33m");
-    output.insert(1, "\033[31m");
-    output.insert(0, "\033[33m");
+    if (enclose_count != 0) { 
+        output.insert(output.length() - 1, "\033[33m");
+        output.insert(1, "\033[31m");
+    }
+    else output.insert(0, "\033[31m");
+    if (enclose_count != 0) output.insert(0, "\033[33m");
     output.insert(0, "\033[0m");
     output += "\033[0m";
 }
 
+void add_enclosing(string & output) {
+    auto enclose = vm["enclose"].as<string>();
+    if (enclose_count == 1) output = enclose[0] + output + enclose[0];
+    else if (enclose_count == 2) output = enclose[0] + output + enclose[1];
+}
+
 template <typename A>
-void print_commands_helper(A commands, string delim, int longest_flag_n) {
+void print_commands_helper(A commands, string delim) {
+    auto lf = get_n_longest_flags(commands);
+    int longest_flag_n = lf[0].length();
+
+    // int char_count = 0;
+    // for (auto i : lf) char_count += i.length();
+    // (kColumn_width < char_count) 
+        // ? cout << "Can NOT fit " << col_n << " columns" << endl
+        // : cout << "CAN fit " << col_n << " columns" << endl;
+    // cout << endl;
+    // delim = "";
+
     int count = 0;
-    int extra_padding = 2;
+    int extra_padding = 2 + enclose_count;
     int col_n = vm["column"].as<int>();
+
 	for (auto iter = commands.begin(); iter != commands.end(); iter++) {
 		if (std::next(iter) == commands.end()) delim = "";
 
-		string output {};
-		int pipe_pos = 0;
+        string command = *iter;
+		string output  = "";
+		int pipe_pos   = 0;
+        if (enclose_count != 0) add_enclosing(command);
+
 		if (mode == Mode::Mixed) {
 			int i = 0;
-			for (auto c : *iter) {
+			for (auto c : command) {
 				if (c != ',') {
 					output.append(string{c});
 					i++;
@@ -478,14 +513,15 @@ void print_commands_helper(A commands, string delim, int longest_flag_n) {
 				}
 			}
 		}
-		else output = *iter;
+		else output = command;
 
         auto tmp_output = output;
 		auto when = vm["color"].as<string>();
-		if ( when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
+		if (when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
 
         if (col_n > 1) {
-            cout << output << string(longest_flag_n + extra_padding - tmp_output.length(), ' ') << delim;
+            string offset(longest_flag_n + extra_padding - tmp_output.length(), ' ');
+            cout << output << offset << delim;
 
             count++;
             if (count == col_n) {
@@ -500,23 +536,10 @@ void print_commands_helper(A commands, string delim, int longest_flag_n) {
 
 template <typename A>
 void print_commands(A commands, string delim, string man_page) {
-    int longest_flag_n = 1;
-
-    auto lf = get_n_longest_flags(commands);
-    longest_flag_n = lf[0].length();
-    int char_count = 0;
-    for (auto i : lf) char_count += i.length();
-
-    // (kColumn_width < char_count) 
-        // ? cout << "Can NOT fit " << col_n << " columns" << endl
-        // : cout << "CAN fit " << col_n << " columns" << endl;
-    // cout << endl;
-    // delim = "";
-
     if (is_title) print_title(man_page);
     if (is_word_count) print_flag_count();
 
-    print_commands_helper(commands, delim, longest_flag_n);
+    print_commands_helper(commands, delim);
 
     if (is_title) print_title(man_page);
     if (is_word_count) print_flag_count();
@@ -529,14 +552,14 @@ int get_command_end_idx(int ac, char ** av) {
 }
 
 int main(int ac, char ** av) {
-    auto end = get_command_end_idx(ac, av);
-    auto spo = set_program_options(end, av);
-    if (spo == 1) return 1;
-
-    string man_page {};
     try {
+        auto end = get_command_end_idx(ac, av);
+        auto spo = set_program_options(end, av);
+
+        if (spo == 1) return 1;
         if (is_debug) print_debug();
 
+        string man_page {};
         man_page = load_man_page(ac, av);
         variant<set<string, ilexic>, vector<string>> commands;
         if (is_sort == true) commands = set<string, ilexic>{};
