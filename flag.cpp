@@ -14,7 +14,8 @@
 using namespace std;
 namespace po = boost::program_options;
 
-static po::options_description desc("Usage: flag [flags] arguments\nAllowed flags", 80);
+const static int kColumn_width = 80;
+static po::options_description desc("Usage: flag [flags] arguments\nAllowed flags", kColumn_width);
 static po::options_description hidden("Hidden options");
 static po::options_description all;
 static po::variables_map vm;
@@ -67,24 +68,29 @@ int set_program_options(int end, char ** av) {
         ("help,h", po::bool_switch()->default_value(false), "Show this help message")
 
         ("short,s", po::bool_switch()->default_value(false), "Show short flag notation, e.g. [-h]")
+
         ("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. [--help] (default notation is short form, e.g. [-h])")
 
         ("mixed,m", po::bool_switch()->default_value(true), "Show mixed flag notation, e.g. [-h|--help]")
 
         ("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
 
-        ("column,c", po::bool_switch()->default_value(false), "List entries by columns") // TO DO
+        ("column,c", po::value<int>()->implicit_value(1)->default_value(1, ""), "List entries by columns") // TO DO
 
         ("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify DELIM used for separating flags; the characters '\\n' and '\\t' retain special meaning, i.e. new line and tab character respectively")
 
         ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
-        ("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the start of the output") // TO DO
+
+        ("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the start of the output")
+
         ("word-count,w", po::bool_switch()->default_value(false), "Show the printed flag count at the bottom of the output")
+
         ("reverse,r", po::bool_switch()->default_value(false), "Reverse the sorting of the output")
 
         ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'")
 
         ("debug,D", po::bool_switch()->default_value(false), "Show debug messages")
+
         ("version,v", po::bool_switch()->default_value(false), "Display version information and exit")
     ;
 
@@ -176,6 +182,8 @@ string load_man_page(int ac, char ** av) {
 }
 
 string set_delimiter() {
+    if (vm["column"].as<int>() > 1) return "";
+
     string delim {vm["delimiter"].as<string>()};
     delim = vm["delimiter"].as<string>();
     if (delim == "\\n") delim = "\n";
@@ -361,10 +369,24 @@ void get_commands(A & commands, string man_page) {
     add_commands(commands, man_page, reg_final);
 }
 
-int get_command_end_idx(int ac, char ** av) {
-    int n = ac - 1;
-    while (n > 0 && av[n][0] == '-') n--;
-    return n > 0 ? n + 1 : ac;
+template <typename A>
+vector<string> get_n_longest_flags(const A commands) {
+    int n = vm["column"].as<int>();
+    vector<string> sorted(commands.begin(), commands.end());
+    std::sort(sorted.begin(), sorted.end(),
+        [](const std::string& a, const std::string& b) {
+            return a.size() > b.size();
+        }
+    );
+
+    vector<string> res = {};
+    auto it = sorted.begin();
+    for (int i = 0; i < n && it != sorted.end(); i++) {
+        res.push_back(*it);
+        it++;
+    }
+
+    return res;
 }
 
 void print_flag_count() {
@@ -388,49 +410,89 @@ void print_title(string man_page) {
     cout << "NAME: " << sm[0] << endl;
 }
 
+void add_colors(string & output, int pipe_pos) {
+    if (pipe_pos != 0) {
+        output.insert(pipe_pos + 1, "\033[32m");
+        output.insert(pipe_pos, "\033[33m");
+    }
+    output.insert(output.length() - 1, "\033[33m");
+    output.insert(1, "\033[31m");
+    output.insert(0, "\033[33m");
+    output.insert(0, "\033[0m");
+    output += "\033[0m";
+}
+
+template <typename A>
+void print_commands_helper(A commands, string delim, int longest_flag_n) {
+    int count = 0;
+    int extra_padding = 2;
+    int col_n = vm["column"].as<int>();
+	for (auto iter = commands.begin(); iter != commands.end(); iter++) {
+		if (std::next(iter) == commands.end()) delim = "";
+
+		string output {};
+		int pipe_pos = 0;
+		if (mode == Mode::Mixed) {
+			int i = 0;
+			for (auto c : *iter) {
+				if (c != ',') {
+					output.append(std::string{c});
+					i++;
+				}
+				else {
+					output.append("|");
+					pipe_pos = i;
+				}
+			}
+		}
+		else output = *iter;
+
+        auto tmp_output = output;
+		auto when = vm["color"].as<string>();
+		if ( when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
+
+        if (col_n > 1) {
+            cout << output << string(longest_flag_n + extra_padding - tmp_output.length(), ' ') << delim;
+
+            count++;
+            if (count == col_n) {
+                cout << endl;
+                count = 0;
+            }
+        }
+        else cout << output << delim;
+	}
+	cout << endl;
+}
+
 template <typename A>
 void print_commands(A commands, string delim, string man_page) {
+    int longest_flag_n = 1;
+
+    auto lf = get_n_longest_flags(commands);
+    longest_flag_n = lf[0].length();
+    int char_count = 0;
+    for (auto i : lf) char_count += i.length();
+
+    // (kColumn_width < char_count) 
+        // ? cout << "Can NOT fit " << col_n << " columns" << endl
+        // : cout << "CAN fit " << col_n << " columns" << endl;
+    // cout << endl;
+    // delim = "";
+
     if (is_title) print_title(man_page);
     if (is_word_count) print_flag_count();
-    for (auto iter = commands.begin(); iter != commands.end(); iter++) {
-        if (std::next(iter) == commands.end()) delim = "";
 
-        string output {};
-        int pipe_pos = 0;
-        if (mode == Mode::Mixed) {
-            int i = 0;
-            for (auto c : *iter) {
-                if (c != ',') {
-                    output.append(std::string{c});
-                    i++;
-                }
-                else {
-                    output.append("|");
-                    pipe_pos = i;
-                }
-            }
-        }
-        else {
-            output = *iter;
-        }
+    print_commands_helper(commands, delim, longest_flag_n);
 
-        auto when = vm["color"].as<string>();
-        if ( when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) {
-            if (pipe_pos != 0) {
-                output.insert(pipe_pos + 1, "\033[32m");
-                output.insert(pipe_pos, "\033[33m");
-            }
-            output.insert(output.length() - 1, "\033[33m");
-            output.insert(1, "\033[31m");
-            output.insert(0, "\033[33m");
-            output.insert(0, "\033[0m");
-            output += "\033[0m";
-        }
-        cout << output << delim;
-    }
-    cout << endl;
     if (is_title) print_title(man_page);
     if (is_word_count) print_flag_count();
+}
+
+int get_command_end_idx(int ac, char ** av) {
+    int n = ac - 1;
+    while (n > 0 && av[n][0] == '-') n--;
+    return n > 0 ? n + 1 : ac;
 }
 
 int main(int ac, char ** av) {
