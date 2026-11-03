@@ -98,7 +98,7 @@ int set_program_options(int end, char ** av) {
 
         ("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify DELIM used for separating flags; the characters '\\n' and '\\t' retain special meaning")
 
-        ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), "Specify ENC used for 'enclosing' the flag output (prepending and appending); 1 or 2 arguments are expected, e.g. -e '|' or --enclose='<>'")
+        ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), "Specify ENC used for 'enclosing' the flag output (prepending and appending); 0, 1 or 2 arguments are expected, e.g. -e '|' or --enclose '<>'")
 
         ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default flag are sorted by the order of appearance)")
 
@@ -151,7 +151,7 @@ int set_program_options(int end, char ** av) {
             if (vm["enclose"].as<string>().length() == 0) enclose_count = 0;
             else if (vm["enclose"].as<string>().length() == 1) enclose_count = 1;
             else if (vm["enclose"].as<string>().length() == 2) enclose_count = 2;
-            else throw string{"Enclose accepts 1 or 2 characters (default is none)"};
+            else throw string{"Flag '--enclose' excpects 0, 1 or 2 characters in the argument"};
         }
 
         mode = Mode::Mixed;
@@ -455,18 +455,37 @@ void print_title(string man_page) {
 
 void add_colors(string & output, int pipe_pos) {
     // 31: red; 32: green; 33: yellow
+    bool is_solo_long = false;
+    if (enclose_count == 0) {
+        (output[1] == '-') ? is_solo_long = true : is_solo_long = false;
+    } else {
+        (output[2] == '-') ? is_solo_long = true : is_solo_long = false;
+    }
+
+    auto s = "\033[31m";
+    auto l = "\033[32m";
+    auto sep = "\033[33m";
+    auto reset = "\033[0m";
+
     if (pipe_pos != 0) {
-        output.insert(pipe_pos + 1, "\033[32m");
-        output.insert(pipe_pos, "\033[33m");
+        output.insert(pipe_pos + 1, l);            // [-s|{--l}]
+        output.insert(pipe_pos, sep);              // [-s{|}--l]
     }
+
     if (enclose_count != 0) { 
-        output.insert(output.length() - 1, "\033[33m");
-        output.insert(1, "\033[31m");
+        output.insert(output.length() - 1, sep);   // [?|?{]}
+        if (!is_solo_long) output.insert(1, s);    // [{-s}|?]
+        else output.insert(1, l);                  // [{--l}]
     }
-    else output.insert(0, "\033[31m");
-    if (enclose_count != 0) output.insert(0, "\033[33m");
-    output.insert(0, "\033[0m");
-    output += "\033[0m";
+    else { 
+        if (!is_solo_long) output.insert(0, s);    // {-s}|?
+        else output.insert(0, l);                  // {--l}
+    }
+
+    if (enclose_count != 0) output.insert(0, sep); // {[}-s|--l]
+
+    output.insert(0, reset);                       // {}[-s|--l]
+    output += reset;                               // [-s|--l]{}
 }
 
 void add_enclosing(string & output) {
