@@ -188,21 +188,21 @@ void add_commands(A & commands, string man_page, string regx) {
 
 		if (mode == Mode::Short) { 
 			if (sm[2].matched) {
-				command = sm[2] + sm[3];
+				command = sm[2];
 			}
-			else if (sm[4].matched) {
-				command = sm[4] + sm[5];
+			else if (sm[5].matched) {
+				command = sm[5];
 			}
-			else continue;
+			else continue; // ???
 		}
 		else if (mode == Mode::Long) {
 			if (sm[2].matched) {
-				command = sm[2] + sm[3] + sm[4];
+				command = sm[2];
 			}
-			else if (sm[5].matched) {
-				command = sm[5] + sm[6] + sm[7];
+			else if (sm[6].matched) {
+				command = sm[6];
 			}
-			else continue;
+			else continue; // ???
 		} else {
 			if (sm[2].matched) {
 				command = sm[3] + "," + sm[6];
@@ -216,12 +216,9 @@ void add_commands(A & commands, string man_page, string regx) {
 			else if (sm[21].matched) {
 				command = sm[21];
 			}
-			else continue;
+			else continue; // ???
 		}
-
-		if (command.size() == 0) cout << "EMPTY: " << sm[0] << endl;
 		command = "[" + command + "]";
-		// cout << "command: " << command << endl;
 
 		bool found = find(commands.begin(), commands.end(), command) != commands.end();
 		if (!found) {
@@ -233,86 +230,127 @@ void add_commands(A & commands, string man_page, string regx) {
 
 template <typename A>
 void get_commands(A & commands, string man_page) {
-	string regx{};
+	string reg_final {};
+
+	string reg_start {R"(
+		# START
+		(?:^[\s]{3,6})\K
+	)"};
+
+	string reg_short {R"(
+		# (1, 2, 3) SHORT
+		((-\w+)(-\w+)*)
+	)"};
+
+	string reg_long {R"(
+		# (1, 2, 3, 4) LONG
+		((--\w+)(-\w+)*(=\w+)?)
+	)"};
+
+	string reg_sls {R"(
+		# SHORT-LONG-SHORT
+		# Long form starts with -- followed by alnum, e.g. --all
+		(?:(?:--\w+)
+			# The flag name can contain a dash in the middle, e.g. --cert-type
+			(?:-\w+)*
+			# Long form can have an equal sign (=), e.g. --protocol=family
+			(?:=\w+)?				
+			# Separation
+			(?:[^-\w\n]{1,2})
+			# (1, 2, 3)
+			((-\w+)(-\w+)*))|
+	)"};
+
+	string reg_lsl {R"(
+		# LONG-SHORT-LONG
+		(?:(?:-\w+)
+			(?:-\w+)*
+			(?:[^-\w\n]{1,2})
+		# (1, 2, 3, 4)
+		((--\w+)(-\w+)*(=\w+)?))|
+	)"};
+
+	string reg_sl {R"(
+		# SHORT-LONG
+		# (1, 2, 3)
+		(((-\w+)
+			# (4)
+			(-\w+)*)
+			(?:[^-\w\n]{1,2})
+		# (5, 6)
+		((--\w+)
+			# (7)
+			(-\w+)*
+			# (8)
+			(=\w+)?))|
+	)"};
+
+	string reg_ls {R"(
+		# LONG_SHORT
+		# (1, 2, 3)
+		(((--\w+)
+			# (4)
+			(-\w+)*
+			# (5)
+			(=\w+)?)
+			(?:[^-\w\n]{1,2})
+		# (6, 7)
+		((-\w+)
+			# (8)
+			(-\w+)*))|
+	)"};
+
+	string reg_end {R"(
+		# END
+		(?:$|[^-\w\n]{2,})
+	)"};
+
 	if (mode == Mode::Short) {
-		regx = R"(
-			(?:^[\s]{3,6})\K				# Has to start with 3-6 \s
-
-											# CASE 1: [--[l-f], -[s-f]]
-			((?:(?:--\w+)					# (1) Long form starts with -- followed by alnum, e.g. --all
-				(?:-\w+)*					# The flag name can contain a dash in the middle, e.g. 
-											# --cert-type
-				(?:=\w+)?					# Long form can have an equal sign (=) followed by an option argument, e.g.
-											# --protocol=family
-				(?:[^-\w\n]{1,2}))			# Separation
-			(-\w+)(-\w+)*|					# (2, 3)
-											# --|--
-											# CASE 2: [-[s-f], --[l-f]] and CASE 3: -[s-f]
-			(-\w+)(-\w+)*)					# (4, 5) Short form starts with - followed my alnum, e.g. -a
-											# ---
-			(?:$|[^-\w\n]{3,})				# END
-		)";
-	}
-	else if (mode == Mode::Long) {
-		regx = R"(
-			(?:^[\s]{3,6})\K
-
-											# CASE 1: [-[s-f], --[l-f]]
-			((?:(?:-\w+)					# (1)
-				(?:-\w+)*
-				(?:[^-\w\n]{1,2}))
-			(--\w+)(-\w+)*(=\w+)?|			# (2, 3, 4)
-											# --|--
-											# CASE 2: [--[l-f], -[s-f]] and CASE 3: --[l-f]
-			(--\w+)(-\w+)*(=\w+)?)			# (5, 6, 7)
-
-			(?:$|[^-\w\n]{3,})				# END
-		)";
-	}
-	else if (mode == Mode::Mixed) {
-		regx = R"(
-			(?:^[\s]{3,6})\K					# START
-
-			(									# (1)
-				# CASE 1: [-[s-f], --[l-f]]
-				(((-\w+)						# (2, 3, 4)
-					(-\w+)*)					# (5)
-					(?:[^-\w\n]{1,2})
-				((--\w+)						# (6, 7)
-					(-\w+)*						# (8)
-					(=\w+)?))|					# (9)
-
-				# CASE 2: [--[l-f], -[s-f]]
-				(((--\w+)						# (10, 11, 12)
-					(-\w+)*						# (13)
-					(=\w+)?)					# (14)
-					(?:[^-\w\n]{1,2})
-				((-\w+)							# (15, 16)
-					(-\w+)*))|					# (17)
-
-				# CASE 3: only -[s-f]
-				((-\w+)(-\w+)*)|				# (18, 19, 20)
-
-				# CASE 4: only --[l-f]
-				((--\w+)(-\w+)*(=\w+)?)			# (21, 22, 23, 24)
-			)									
-
-			(?:$|[^-\w\n]{3,})					# END
-		)";
+		reg_final = 
+			reg_start +
+			"(" + 		// (1)
+			reg_sls + 	// (2, ..., 4)
+			reg_short + // (5, ..., 7)
+			")" + 
+			reg_end
+		;
+	} else if (mode == Mode::Long) {
+		reg_final = 
+			reg_start +
+			"(" + 		// (1)
+			reg_lsl + 	// (2, ..., 5)
+			reg_long + 	// (6, ..., 9)
+			")" + 
+			reg_end
+		;
+	} else if (mode == Mode::Mixed) {
+		reg_final = 
+			reg_start +
+			"(" + 		// (1)
+			reg_sl +	// (2, ..., 9)
+			reg_ls +	// (10, ..., 17)
+			reg_short + // (18, ..., 20)
+			"|" +
+			reg_long + 	// (21, ..., 24)
+			")" +
+			reg_end
+		;
+	} else {
+		// TO DO: Throw error
 	}
 
-	add_commands(commands, man_page, regx);
+	// cout << "reg_final: " << reg_final << endl;
+	add_commands(commands, man_page, reg_final);
 }
 
 template <typename A>
 void print_commands(A commands, string delim) {
-	// cout << "delim = " << delim;
 	for (auto iter = commands.begin(); iter != commands.end(); iter++) {
 		if (std::next(iter) == commands.end()) delim = "";
 
 		string output {};
+		int pipe_pos = 0;
 		if (mode == Mode::Mixed) {
-			int pipe_pos = 0;
 			int i = 0;
 			for (auto c : *iter) {
 				if (c != ',') {
@@ -324,22 +362,22 @@ void print_commands(A commands, string delim) {
 					pipe_pos = i;
 				}
 			}
-
-			auto when = vm["color"].as<string>();
-			if ( when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) {
-				if (pipe_pos != 0) {
-					output.insert(pipe_pos + 1, "\033[32m");
-					output.insert(pipe_pos, "\033[33m");
-				}
-				output.insert(output.length() - 1, "\033[33m");
-				output.insert(1, "\033[31m");
-				output.insert(0, "\033[33m");
-				output.insert(0, "\033[0m");
-				output += "\033[0m";
-			}
 		}
 		else {
 			output = *iter;
+		}
+
+		auto when = vm["color"].as<string>();
+		if ( when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) {
+			if (pipe_pos != 0) {
+				output.insert(pipe_pos + 1, "\033[32m");
+				output.insert(pipe_pos, "\033[33m");
+			}
+			output.insert(output.length() - 1, "\033[33m");
+			output.insert(1, "\033[31m");
+			output.insert(0, "\033[33m");
+			output.insert(0, "\033[0m");
+			output += "\033[0m";
 		}
 		cout << output << delim;
 	}
