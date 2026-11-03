@@ -27,11 +27,12 @@ static const std::unordered_map<std::string, Mode> kModes {
 };
 static Mode mode;
 
-static bool is_sort = false;
-static bool is_reverse = false;
-static bool is_debug = false;
+static bool is_sort       = false;
+static bool is_reverse    = false;
+static bool is_debug      = false;
 static bool is_word_count = false;
-static string version = "1.0.0";
+static bool is_title      = false;
+static string version     = "1.0.0";
 
 
 // DEBUGGING
@@ -40,12 +41,13 @@ void print_debug() {
     auto m = int(mode) == 0 ? "short"
         : int(mode) == 1 ? "long"
         : "mixed";
-    cout << "Mode: " << int(mode) << " (" << m << ")" << endl;
-    cout << "Delimiter: " << "'" << vm["delimiter"].as<string>() << "'" << endl;
-    cout << "Sort: " << boolalpha << is_sort << endl;
-    cout << "Reverse: " << is_reverse << endl;
-    cout << "Debug: " << is_debug << endl;
-    cout << "Version: " << version << endl;
+
+    cout << "Mode: "      << int(mode)  << " (" << m << ")" << endl;
+    cout << "Delimiter: " << "'"        << vm["delimiter"].as<string>() << "'" << endl;
+    cout << "Sort: "      << boolalpha  << is_sort << endl;
+    cout << "Reverse: "   << is_reverse << endl;
+    cout << "Debug: "     << is_debug   << endl;
+    cout << "Version: "   << version    << endl;
     cout << endl;
 }
 
@@ -77,7 +79,7 @@ int set_program_options(int end, char ** av) {
 
         ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default it is sorted by the order of appearance in the man page)")
         ("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the start of the output") // TO DO
-        ("word-count,w", po::bool_switch()->default_value(false), "Show the printed flag count at the bottom of the output") // TO DO
+        ("word-count,w", po::bool_switch()->default_value(false), "Show the printed flag count at the bottom of the output")
         ("reverse,r", po::bool_switch()->default_value(false), "Reverse the sorting of the output")
 
         ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'")
@@ -119,6 +121,9 @@ int set_program_options(int end, char ** av) {
     }
     if (vm["word-count"].as<bool>()) {
         is_word_count = true;
+    }
+    if (vm["title"].as<bool>()) {
+        is_title = true;
     }
     if (vm["debug"].as<bool>()) {
         is_debug = true;
@@ -349,7 +354,7 @@ void get_commands(A & commands, string man_page) {
             reg_end
         ;
     } else {
-        // TO DO: Throw error
+        throw "Invalid flag notation (expected short, long or mixed)";
     }
 
     // cout << "reg_final: " << reg_final << endl;
@@ -369,8 +374,23 @@ void print_flag_count() {
          << " | TT: " << flag_count[Mode::Short] + flag_count[Mode::Long] + flag_count[Mode::Mixed] << endl;
 }
 
+void print_title(string man_page) {
+    string regx = R"(
+        (?:^NAME\n\s{2,})\K
+        .*
+        (?=\n)
+    )";
+
+    const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
+    boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
+
+    auto sm = *sr_iterator;
+    cout << "NAME: " << sm[0] << endl;
+}
+
 template <typename A>
-void print_commands(A commands, string delim) {
+void print_commands(A commands, string delim, string man_page) {
+    if (is_title) print_title(man_page);
     if (is_word_count) print_flag_count();
     for (auto iter = commands.begin(); iter != commands.end(); iter++) {
         if (std::next(iter) == commands.end()) delim = "";
@@ -409,6 +429,7 @@ void print_commands(A commands, string delim) {
         cout << output << delim;
     }
     cout << endl;
+    if (is_title) print_title(man_page);
     if (is_word_count) print_flag_count();
 }
 
@@ -428,7 +449,7 @@ int main(int ac, char ** av) {
         visit([&](auto & c) { get_commands(c, man_page); }, commands);
 
         string delim = set_delimiter();
-        visit([&](auto & c) { print_commands(c, delim); }, commands);
+        visit([&](auto & c) { print_commands(c, delim, man_page); }, commands);
 
         return 0;
     } catch (const string& e) {
