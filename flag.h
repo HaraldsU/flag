@@ -32,7 +32,6 @@ inline bool is_sort                             = false;
 inline bool is_debug                            = false;
 inline std::unordered_map<Mode, int> flag_count = {};
 
-int get_command_end_idx(int ac,char ** av);
 int set_program_options(int end,char ** av);
 void print_debug();
 std::string load_man_page(int ac,char ** av);
@@ -86,8 +85,8 @@ void add_commands(A & commands, std::string man_page, std::string regx) {
                 command = sm[2];
                 flag_count[Mode::Long]++;
             }
-            else if (sm[6].matched) {
-                command = sm[6];
+            else if (sm[7].matched) {
+                command = sm[7];
                 flag_count[Mode::Long]++;
             }
             else continue;
@@ -95,18 +94,22 @@ void add_commands(A & commands, std::string man_page, std::string regx) {
             if (sm[2].matched) {
                 command = sm[3] + "," + sm[6];
                 flag_count[Mode::Mixed]++;
+                // std::cout << "MATCHED SL !!!" << std::endl;
             }
             else if (sm[10].matched) {
                 command = sm[15] + "," + sm[11];
                 flag_count[Mode::Mixed]++;
+                // std::cout << "MATCHED LS !!!" << std::endl;
             }
             else if (!is_mixed_only) {
-                if (sm[18].matched) {
-                    command = sm[18];
+                if (sm[19].matched) {
+                    // std::cout << "MATCHED SHORT !!!" << std::endl;
+                    command = sm[19];
                     flag_count[Mode::Short]++;
                 }
-                else if (sm[21].matched) {
-                    command = sm[21];
+                else if (sm[23].matched) {
+                    // std::cout << "MATCHED LONG !!!" << std::endl;
+                    command = sm[23];
                     flag_count[Mode::Long]++;
                 }
                 else continue;
@@ -116,6 +119,7 @@ void add_commands(A & commands, std::string man_page, std::string regx) {
 
         bool found = find(commands.begin(), commands.end(), command) != commands.end();
         if (!found) {
+            // std::cout << "FOUND !!!" << std::endl;
             if (is_reverse == false) commands.insert(commands.end(), command);
             else commands.insert(commands.begin(), command);
         }
@@ -138,7 +142,8 @@ void get_commands(A & commands, std::string man_page) {
 
     std::string reg_long {R"(
         # (1, 2, 3, 4) LONG
-        ((--\w+)(-\w+)*(=\w+)?)
+        # ((--\w+)(-\w+)*(?:\[)?(=\w+)?(?:\])?)
+        ((--\w+)(-\w+)*(\[)?(=[^\s,]+)?)
     )"};
 
     std::string reg_sls {R"(
@@ -159,25 +164,14 @@ void get_commands(A & commands, std::string man_page) {
         # LONG-SHORT-LONG
         (?:(?:-\w+)
             (?:-\w+)*
-            (?:[^-\w\n]{1,2})
-        # (1, 2, 3, 4)
-        ((--\w+)(-\w+)*(=\w+)?))|
-    )"};
+            (?:[^-\w\n]{1,2})))" + reg_long + "|"};
+        // # (1, 2, 3, 4)
+        // ((--\w+)(-\w+)*(?:\[)?(=\w+)?(?:\])?))|
+    // )"};
 
     std::string reg_sl {R"(
-        # SHORT-LONG
-        # (1, 2, 3)
-        (((-\w+)
-            # (4)
-            (-\w+)*)
-            (?:[^-\w\n]{1,2})
-        # (5, 6)
-        ((--\w+)
-            # (7)
-            (-\w+)*
-            # (8)
-            (=\w+)?))|
-    )"};
+        # (1, 2, 3, 4) SHORT-LONG
+        (((-\w+)(-\w+)*)(?:[^-\w\n]{1,2})))" + reg_long + "|"};
 
     std::string reg_ls {R"(
         # LONG_SHORT
@@ -262,61 +256,61 @@ void add_enclosing(std::string & output);
 
 template <typename A>
 void print_commands_helper(A commands, std::string delim) {
-    auto lf = get_n_longest_flags(commands);
-    int longest_flag_n = lf[0].length();
+auto lf = get_n_longest_flags(commands);
+int longest_flag_n = lf[0].length();
 
-    // int char_count = 0;
-    // for (auto i : lf) char_count += i.length();
-    // (kColumn_width < char_count) 
-        // ? std::cout << "Can NOT fit " << col_n << " columns" << std::endl
-        // : std::cout << "CAN fit " << col_n << " columns" << std::endl;
-    // std::cout << std::endl;
-    // delim = "";
+// int char_count = 0;
+// for (auto i : lf) char_count += i.length();
+// (kColumn_width < char_count) 
+    // ? std::cout << "Can NOT fit " << col_n << " columns" << std::endl
+    // : std::cout << "CAN fit " << col_n << " columns" << std::endl;
+// std::cout << std::endl;
+// delim = "";
 
-    int count = 0;
-    int extra_padding = 2 + enclose_count;
-    int col_n = vm["column"].as<int>();
+int count = 0;
+int extra_padding = 2 + enclose_count;
+int col_n = vm["column"].as<int>();
 
-	for (auto iter = commands.begin(); iter != commands.end(); iter++) {
-		if (std::next(iter) == commands.end()) delim = "";
+for (auto iter = commands.begin(); iter != commands.end(); iter++) {
+    if (std::next(iter) == commands.end()) delim = "";
 
-        std::string command = *iter;
-		std::string output  = "";
-		int pipe_pos   = 0;
-        if (enclose_count != 0) add_enclosing(command);
+    std::string command = *iter;
+    std::string output  = "";
+    int pipe_pos   = 0;
+    if (enclose_count != 0) add_enclosing(command);
 
-		if (mode == Mode::Mixed) {
-			int i = 0;
-			for (auto c : command) {
-				if (c != ',') {
-					output.append(std::string{c});
-					i++;
-				}
-				else {
-					output.append("|");
-					pipe_pos = i;
-				}
-			}
-		}
-		else output = command;
-
-        auto tmp_output = output;
-		auto when = vm["color"].as<std::string>();
-		if (when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
-
-        if (col_n > 1) {
-            std::string offset(longest_flag_n + extra_padding - tmp_output.length(), ' ');
-            std::cout << output << offset << delim;
-
-            count++;
-            if (count == col_n) {
-                std::cout << std::endl;
-                count = 0;
+    if (mode == Mode::Mixed) {
+        int i = 0;
+        for (auto c : command) {
+            if (c != ',') {
+                output.append(std::string{c});
+                i++;
+            }
+            else {
+                output.append("|");
+                pipe_pos = i;
             }
         }
-        else std::cout << output << delim;
-	}
-	std::cout << std::endl;
+    }
+    else output = command;
+
+    auto tmp_output = output;
+    auto when = vm["color"].as<std::string>();
+    if (when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
+
+    if (col_n > 1) {
+        std::string offset(longest_flag_n + extra_padding - tmp_output.length(), ' ');
+        std::cout << output << offset << delim;
+
+        count++;
+        if (count == col_n) {
+            std::cout << std::endl;
+            count = 0;
+        }
+    }
+    else std::cout << output << delim;
+}
+std::cout << std::endl;
 }
 
 template <typename A>
@@ -324,5 +318,18 @@ void print_commands(A commands, std::string delim, std::string man_page) {
     print_commands_helper(commands, delim);
     if (is_title) print_title(man_page);
     if (is_word_count) print_flag_count();
+}
+
+inline void reset_globals() {
+    vm.clear();
+    mode          = Mode::Mixed;
+    is_mixed_only = false;
+    is_reverse    = false;
+    enclose_count = 2;
+    is_word_count = false;
+    is_title      = false;
+    is_sort       = false;
+    is_debug      = false;
+    flag_count.clear();
 }
 

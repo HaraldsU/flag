@@ -15,10 +15,6 @@ namespace po = boost::program_options;
 const static int kColumn_width  = 100;
 const static string version     = "1.0.0";
 
-static po::options_description desc("Usage: flag [flags] [argument]\nFlags", kColumn_width);
-static po::options_description hidden("Hidden options");
-static po::options_description all;
-
 // DEBUGGING
 string escape(const string& s) {
     string out;
@@ -64,6 +60,10 @@ void print_sub_matches_debug(boost::smatch sm) {
 
 
 int set_program_options(int end, char ** av) {
+    po::options_description desc("Usage: flag [flags] [argument]\nFlags", kColumn_width);
+    po::options_description hidden("Hidden options");
+    po::options_description all;
+
     desc.add_options()
         ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'")
 
@@ -116,6 +116,9 @@ int set_program_options(int end, char ** av) {
         if (vm["help"].as<bool>() or !vm.count("input")) {
             cout << desc << endl;
             return 1;
+        }
+        else if (vm["input"].as<vector<string>>().size() > 1) {
+            throw std::string{"Flag: too many arguments (1 is excpected)"};
         }
         else if (vm["version"].as<bool>()) {
             cout << "flag " << version << endl;
@@ -245,11 +248,5 @@ void add_enclosing(string & output) {
     auto enclose = vm["enclose"].as<string>();
     if (enclose_count == 1) output = enclose[0] + output + enclose[0];
     else if (enclose_count == 2) output = enclose[0] + output + enclose[1];
-}
-
-int get_command_end_idx(int ac, char ** av) {
-    int n = ac - 1;
-    while (n > 0 && av[n][0] == '-') n--;
-    return n > 0 ? n + 1 : ac;
 }
 

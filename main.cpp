@@ -2,14 +2,12 @@
 
 int main(int ac, char ** av) {
     try {
-        auto end = get_command_end_idx(ac, av);
-        auto spo = set_program_options(end, av);
+        auto spo = set_program_options(ac, av);
 
         if (spo == 1) return 0;
         if (is_debug) print_debug();
 
-        std::string man_page {};
-        man_page = load_man_page(ac, av);
+        std::string man_page = load_man_page(ac, av);
 
         std::variant<std::set<std::string, ilexic>, std::vector<std::string>> commands;
         if (is_sort == true) commands = std::set<std::string, ilexic>{};
