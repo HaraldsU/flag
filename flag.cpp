@@ -15,7 +15,9 @@ using namespace std;
 namespace po = boost::program_options;
 
 const static int kColumn_width = 100;
-static po::options_description desc("Usage: flag [flags] argument\nAllowed flags", kColumn_width);
+const static string version     = "1.0.0";
+
+static po::options_description desc("Usage: flag [flags] [argument]\nFlags", kColumn_width);
 static po::options_description hidden("Hidden options");
 static po::options_description all;
 static po::variables_map vm;
@@ -27,18 +29,18 @@ static const unordered_map<string, Mode> kModes {
     {"mixed",  Mode::Mixed},
     {"mixed-only",  Mode::Mixed}
 };
-static Mode mode;
 
+static Mode mode          = Mode::Mixed;
+static bool is_mixed_only = false;
 static bool is_sort       = false;
 static bool is_reverse    = false;
 static bool is_debug      = false;
 static bool is_word_count = false;
 static bool is_title      = false;
-static bool is_mixed_only = false;
 static int enclose_count  = 2;
-static string version     = "1.0.0";
 
 
+// DEBUGGING
 string escape(const string& s) {
     string out;
     for (char c : s) {
@@ -52,20 +54,22 @@ string escape(const string& s) {
     return out;
 }
 
-// DEBUGGING
 void print_debug() {
     cout << "DEBUG:" << endl;
     auto m = int(mode) == 0 ? "short"
         : int(mode) == 1 ? "long"
         : "mixed";
 
-    cout << "Mode: "       << int(mode)  << " (" << m << ")" << endl;
-    cout << "Mixed-only: " << boolalpha  << is_mixed_only << endl;
-    cout << "Delimiter: "  << "'"        << escape(vm["delimiter"].as<string>()) << "'" << endl;
-    cout << "Sort: "       << boolalpha  << is_sort << endl;
-    cout << "Reverse: "    << is_reverse << endl;
-    cout << "Debug: "      << is_debug   << endl;
-    cout << "Version: "    << version    << endl;
+    cout << "Mode: "          << int(mode)     << " (" << m << ")" << endl;
+    cout << "Mixed-only: "    << boolalpha     << is_mixed_only << endl;
+    cout << "Delimiter: "     << "'"           << escape(vm["delimiter"].as<string>()) << "'" << endl;
+    cout << "Sort: "          << boolalpha     << is_sort << endl;
+    cout << "Reverse: "       << boolalpha     << is_reverse << endl;
+    cout << "Word count: "    << boolalpha     << is_word_count << endl;
+    cout << "Title: "         << boolalpha     << is_title      << endl;
+    cout << "Enclose count: " << enclose_count << endl;
+    cout << "Debug: "         << boolalpha     << is_debug   << endl;
+    cout << "Version: "       << version       << endl;
     cout << endl;
 }
 
@@ -82,37 +86,37 @@ void print_sub_matches_debug(boost::smatch sm) {
 
 int set_program_options(int end, char ** av) {
     desc.add_options()
-        ("help,h", po::bool_switch()->default_value(false), "Show this help message")
-
-        ("short,s", po::bool_switch()->default_value(false), "Show short flag notation, e.g. [-h]")
-
-        ("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. [--help]")
-
-        ("mixed,m", po::bool_switch()->default_value(true), "Show mixed flag notation, e.g. [-h|--help]")
-
-        ("mixed-only,M", po::bool_switch()->default_value(false), "Show only flags that have both short and long notations")
-
-        ("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
+        ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'")
 
         ("column,c", po::value<int>()->value_name("COL")->implicit_value(1)->default_value(1, ""), "List entries by columns; COL specifies the column count")
 
-        ("delimiter,d", po::value<string>()->value_name("DELIM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify DELIM used for separating flags; the characters '\\n' and '\\t' retain special meaning")
-
-        ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), "Specify ENC used for 'enclosing' the flag output (prepending and appending); 0, 1 or 2 arguments are expected, e.g. -e '|' or --enclose '<>'")
-
-        ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default flag are sorted by the order of appearance)")
-
-        ("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the top and bottom of the output")
-
-        ("word-count,w", po::bool_switch()->default_value(false), "Show the printed flag count at the top and bottom of the output")
-
-        ("reverse,r", po::bool_switch()->default_value(false), "Reverse the sorting of the output")
-
-        ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'")
+        ("delimiter,d", po::value<string>()->value_name("DEM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify DEM used for separating flags; the characters '\\n' and '\\t' retain special meaning")
 
         ("debug,D", po::bool_switch()->default_value(false), "Show debug messages")
 
+        ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), "Specify ENC used for 'enclosing' the flag output (prepending and appending); 0, 1 or 2 arguments are expected, e.g. -e '|' or --enclose '{}'")
+
+        ("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
+
+        ("help,h", po::bool_switch()->default_value(false), "Show this help message")
+
+        ("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. --help")
+
+        ("mixed,m", po::bool_switch()->default_value(true), "Show mixed flag notation, e.g. -h|--help")
+
+        ("mixed-only,M", po::bool_switch()->default_value(false), "Show only flags that have both short and long notations")
+
+        ("reverse,r", po::bool_switch()->default_value(false), "Reverse the sorting of the output")
+
+        ("short,s", po::bool_switch()->default_value(false), "Show short flag notation, e.g. -h")
+
+        ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default flag are sorted by the order of appearance)")
+
+        ("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the bottom of the output")
+
         ("version,v", po::bool_switch()->default_value(false), "Display version information and exit")
+
+        ("word-count,w", po::bool_switch()->default_value(false), "Show the flag count at the bottom of the output")
     ;
 
     hidden.add_options()
@@ -178,7 +182,7 @@ int set_program_options(int end, char ** av) {
 
 struct ilexic {
     // Strip the dashes at the start to start comparing with alnum
-    static string strip_start(const string& s) {
+    static string strip_start(const string & s) {
         auto it = find_if(s.begin(), s.end(), [](unsigned char c) { return isalnum(c); });
         return string(it, s.end());
     }
@@ -188,7 +192,7 @@ struct ilexic {
         return s;
     }
 
-    bool operator()(const string& a, const string& b) const {
+    bool operator()(const string & a, const string & b) const {
         string x = strip_start(a);
         string y = strip_start(b);
         if (is_reverse == true) return make_tuple(lower(y), y, b) < make_tuple(lower(x), x, a);
@@ -198,14 +202,12 @@ struct ilexic {
 
 string load_man_page(int ac, char ** av) {
     auto input = boost::algorithm::join(vm["input"].as<vector<string>>(), " ");
-    string command{ "man "s + input + " 2>/dev/null | "s + "cat"s};
-    
+    string command {"man " + input + " 2>/dev/null | " + "cat"};
     string man_page {};
+
     auto po = popen(command.c_str(), "r");
     char buf[1024];
-    while (fgets(buf, 1024, po)) {
-        man_page.append(buf);
-    }
+    while (fgets(buf, 1024, po)) man_page.append(buf);
     pclose(po);
 
     if (man_page.size() == 0) throw string{"Man page for command \"" + string{av[ac -1]} + "\" not found"};
@@ -277,10 +279,7 @@ void add_commands(A & commands, string man_page, string regx) {
                 else continue;
             }
             else continue;
-        } else {
-            throw string{"Invalid flag notation (expected short, long or mixed)"};
-        }
-        // command = "[" + command + "]";
+        } else throw string{"Invalid flag notation (expected short, long or mixed)"};
 
         bool found = find(commands.begin(), commands.end(), command) != commands.end();
         if (!found) {
@@ -397,19 +396,12 @@ void get_commands(A & commands, string man_page) {
             ")" +
             reg_end
         ;
-    } else {
-        throw string{"Invalid flag notation (expected short, long or mixed)"};
-    }
+    } else throw string{"Invalid flag notation (expected short, long or mixed)"};
 
-    // cout << "reg_final: " << reg_final << endl;
     try {
         add_commands(commands, man_page, reg_final);
-        if (commands.size() == 0) {
-            throw string{"No flags found (try flag -m)"};
-        }
-    } catch (const string & e) {
-        throw e;
-    }
+        if (commands.size() == 0) throw string{"No flags found (try flag -m)"};
+    } catch (const string & e) { throw e; }
 }
 
 template <typename A>
@@ -417,9 +409,7 @@ vector<string> get_n_longest_flags(const A commands) {
     int n = vm["column"].as<int>();
     vector<string> sorted(commands.begin(), commands.end());
     sort(sorted.begin(), sorted.end(),
-        [](const string& a, const string& b) {
-            return a.size() > b.size();
-        }
+        [](const string& a, const string& b) { return a.size() > b.size(); }
     );
 
     vector<string> res = {};
@@ -433,7 +423,8 @@ vector<string> get_n_longest_flags(const A commands) {
 }
 
 void print_flag_count() {
-    cout <<    "SF: " << flag_count[Mode::Short]
+    cout <<    "COUNT: "
+         <<    "SF: " << flag_count[Mode::Short]
          << " | LF: " << flag_count[Mode::Long]
          << " | MF: " << flag_count[Mode::Mixed]
          << " | TT: " << flag_count[Mode::Short] + flag_count[Mode::Long] + flag_count[Mode::Mixed] << endl;
@@ -555,11 +546,7 @@ void print_commands_helper(A commands, string delim) {
 
 template <typename A>
 void print_commands(A commands, string delim, string man_page) {
-    if (is_title) print_title(man_page);
-    if (is_word_count) print_flag_count();
-
     print_commands_helper(commands, delim);
-
     if (is_title) print_title(man_page);
     if (is_word_count) print_flag_count();
 }
@@ -575,11 +562,12 @@ int main(int ac, char ** av) {
         auto end = get_command_end_idx(ac, av);
         auto spo = set_program_options(end, av);
 
-        if (spo == 1) return 1;
+        if (spo == 1) throw "Error while setting the program options";
         if (is_debug) print_debug();
 
         string man_page {};
         man_page = load_man_page(ac, av);
+
         variant<set<string, ilexic>, vector<string>> commands;
         if (is_sort == true) commands = set<string, ilexic>{};
         else commands = vector<string>{};
