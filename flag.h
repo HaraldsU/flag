@@ -70,46 +70,35 @@ void add_commands(A & commands, std::string man_page, std::string regx) {
         if (is_debug) print_sub_matches_debug(sm); // DEBUG
 
         if (mode == Mode::Short) { 
-            if (sm[2].matched) {
-                command = sm[2];
-                flag_count[Mode::Short]++;
-            }
-            else if (sm[5].matched) {
-                command = sm[5];
-                flag_count[Mode::Short]++;
-            }
+            if (sm[4].matched) command = sm[4];      // LS
+            else if (sm[3].matched) command = sm[3]; // SHORT OR SL
             else continue;
+            flag_count[Mode::Short]++;
         }
+
         else if (mode == Mode::Long) {
-            if (sm[2].matched) {
-                command = sm[2];
-                flag_count[Mode::Long]++;
-            }
-            else if (sm[7].matched) {
-                command = sm[7];
-                flag_count[Mode::Long]++;
-            }
+            if (sm[3].matched) command = sm[3];      // SL
+            else if (sm[4].matched) command = sm[4]; // LONG OR LS
             else continue;
-        } else if (mode == Mode::Mixed) {
-            if (sm[2].matched) {
-                command = sm[3] + "," + sm[6];
+            flag_count[Mode::Long]++;
+        } 
+
+        else if (mode == Mode::Mixed) {
+            if (sm[5].matched) {                    // LS
+                command = sm[7] + "," + sm[6];
                 flag_count[Mode::Mixed]++;
-                // std::cout << "MATCHED SL !!!" << std::endl;
             }
-            else if (sm[10].matched) {
-                command = sm[15] + "," + sm[11];
+            else if (sm[2].matched) {                // SL
+                command = sm[3] + "," + sm[4];
                 flag_count[Mode::Mixed]++;
-                // std::cout << "MATCHED LS !!!" << std::endl;
             }
             else if (!is_mixed_only) {
-                if (sm[19].matched) {
-                    // std::cout << "MATCHED SHORT !!!" << std::endl;
-                    command = sm[19];
+                if (sm[8].matched) {                // SHORT
+                    command = sm[8];
                     flag_count[Mode::Short]++;
                 }
-                else if (sm[23].matched) {
-                    // std::cout << "MATCHED LONG !!!" << std::endl;
-                    command = sm[23];
+                else if (sm[10].matched) {           // LONG
+                    command = sm[10];
                     flag_count[Mode::Long]++;
                 }
                 else continue;
@@ -119,7 +108,6 @@ void add_commands(A & commands, std::string man_page, std::string regx) {
 
         bool found = find(commands.begin(), commands.end(), command) != commands.end();
         if (!found) {
-            // std::cout << "FOUND !!!" << std::endl;
             if (is_reverse == false) commands.insert(commands.end(), command);
             else commands.insert(commands.begin(), command);
         }
@@ -130,100 +118,139 @@ template <typename A>
 void get_commands(A & commands, std::string man_page) {
     std::string reg_final {};
 
+    // netstat has 3 spaces
     std::string reg_start {R"(
         # START
-        (?:^[\s]{3,6})\K
+        (?:^[ ]{3,6})\K
     )"};
 
+    // Short form starts with - followed by \w, e.g. -a (ls)
+    // The flag name can contain a dash in the middle, e.g. -fcheck-new (gcc)
+    // (needs example ???)
+    // This is a valid flag -E ENCODING (rg)
+    // -I[FMT] (date)
     std::string reg_short {R"(
-        # (1, 2, 3, 4) SHORT
-        ((-\w+)(-\w+)*(\s\w+)?(?=[ ]|,[ ]--|$))
+        # SHORT
+        (
+            (?:-\w+)
+            (?:-\w+)*
+            (?:[\s\[]\w+\]?)?
+        )
     )"};
 
+    // Long form starts with -- followed by \w, e.g. --all (ls)
+    // The flag name can contain a dash in the middle, e.g. --max-line-length (wc)
+    // This is a valid flag --follow[={name|descriptor}] (tail)
+    // This is the usual notation: --date=STRING (date)
+    // [--bytes=[-]NUM] (head) and [-L --license -V --version] (bzip2)
     std::string reg_long {R"(
-        # (1, 2, 3, 4) LONG
-        # ((--\w+)(-\w+)*(?:\[)?(=\w+)?(?:\])?)
-        ((--\w+)(-\w+)*(\[)?(=[^\s,]+)?)
+        # LONG
+        (
+            (?:--\w+)
+            (?:-\w+)*
+            (?:\[)?
+            (?:
+                (?:=|[ ])
+                (?:
+                    (?:[^-\s,]+)|
+                    (?:\[.\]\w+)
+                )
+            )?
+        )
     )"};
 
-    std::string reg_sls {R"(
-        # SHORT-LONG-SHORT
-        # Long form starts with -- followed by alnum, e.g. --all
-        (?:(?:--\w+)
-            # The flag name can contain a dash in the middle, e.g. --cert-type
-            (?:-\w+)*
-            # Long form can have an equal sign (=), e.g. --protocol=family
-            (?:=\w+)?
-            # Separation
-            (?:[^-\w\n]{1,2})
-            # (1, 2, 3)
-            ((-\w+)(-\w+)*))|
-    )"};
-
-    std::string reg_lsl {R"(
-        # LONG-SHORT-LONG
-        (?:(?:-\w+)
-            (?:-\w+)*
-            (?:[^-\w\n]{1,2})))" + reg_long + "|"};
-        // # (1, 2, 3, 4)
-        // ((--\w+)(-\w+)*(?:\[)?(=\w+)?(?:\])?))|
-    // )"};
-
-    std::string reg_sl {R"(
-        # (1, 2, 3, 4) SHORT-LONG
-        (((-\w+)(-\w+)*)(?:[^-\w\n]{1,2})))" + reg_long + "|"};
-
-    std::string reg_ls {R"(
-        # LONG_SHORT
-        # (1, 2, 3)
-        (((--\w+)
-            # (4)
-            (-\w+)*
-            # (5)
-            (=\w+)?)
-            (?:[^-\w\n]{1,2})
-        # (6, 7)
-        ((-\w+)
-            # (8)
-            (-\w+)*))|
+    std::string reg_sep {R"(
+        # SEP
+        (?:
+            [ |, ](?=--)|
+            [ ]-\w|
+            [^-\w\n]{2,}|
+            [ ]\(
+        )
     )"};
 
     std::string reg_end {R"(
         # END
-        (?:$|[^-\w\n]{2,})
+        (?=
+           $|
+           (?:[ ]|,[ ])-+|
+           [ ]{2,}\w|
+           ,[ ]-\w{2,}|
+           [ ]\(\w
+        )
     )"};
+
+    // LONG-SHORT (want to capture SHORT)
+    std::string reg_sls =
+        "(?:" +
+            reg_long + reg_sep +
+        ")" +
+        reg_short // Actual capture
+    ;
+
+    // SHORT-LONG (want to capture LONG)
+    std::string reg_lsl =
+        "(?:" +
+            reg_short + reg_sep +
+        ")" +
+        reg_long // Actual capture
+    ;
+
+    // SHORT-LONG (want to capture BOTH)
+    std::string reg_sl = 
+        "(" +
+            reg_short + // Capture
+            reg_sep +
+            reg_long +  // Capture
+        ")"
+    ;
+
+    // LONG-SHORT (want to capture BOTH)
+    std::string reg_ls =
+        "(" +
+            reg_long +  // Capture
+            reg_sep +
+            reg_short + // Capture
+        ")"
+    ;
 
     if (mode == Mode::Short) {
         reg_final = 
             reg_start +
-            "(" +       // (1)
-            reg_sls +   // (2, ..., 4)
-            reg_short + // (5, ..., 7)
-            ")" + 
+            "(" +           // (1)
+                reg_sls +   // (2...6)
+                "|" +
+                reg_short + // (7...10...)
+            ")" +
             reg_end
         ;
     } else if (mode == Mode::Long) {
         reg_final = 
             reg_start +
-            "(" +       // (1)
-            reg_lsl +   // (2, ..., 5)
-            reg_long +  // (6, ..., 9)
-            ")" + 
+            "(" +           // (1)
+                reg_lsl +   // (2...6)
+                "|" +
+                reg_long +  // (6...10...)
+            ")" +
             reg_end
         ;
     } else if (mode == Mode::Mixed) {
         reg_final = 
             reg_start +
-            "(" +       // (1)
-            reg_sl +    // (2, ..., 9)
-            reg_ls +    // (10, ..., 17)
-            reg_short + // (18, ..., 20)
-            "|" +
-            reg_long +  // (21, ..., 24)
+            "(" +                       // (1)
+                reg_sl +                // (2...9)
+                "|" +
+                reg_ls +                // (10...17)
+                "|" +
+                "(" + reg_short + ")" + // (18...21)
+                "|" +
+                "(" + reg_long +  ")" +  // (22...25)
             ")" +
             reg_end
         ;
     } else throw std::string{"Invalid flag notation (expected short, long or mixed)"};
+
+    // std::cout << "reg_final: " << reg_final << std::endl;
 
     try {
         add_commands(commands, man_page, reg_final);
