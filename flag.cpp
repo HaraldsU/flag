@@ -117,9 +117,9 @@ int set_program_options(int end, char ** av) {
             cout << desc << endl;
             return 1;
         }
-        else if (vm["input"].as<vector<string>>().size() > 1) {
-            throw std::string{"Flag: too many arguments (1 is excpected)"};
-        }
+        // else if (vm["input"].as<vector<string>>().size() > 1) {
+            // throw std::string{"Flag: too many arguments (1 is excpected)"};
+        // }
         else if (vm["version"].as<bool>()) {
             cout << "flag " << version << endl;
             return 1;

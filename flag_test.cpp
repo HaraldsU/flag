@@ -102,7 +102,7 @@ BOOST_AUTO_TEST_CASE(load_man_page_ls) {
     BOOST_TEST(man_page.length() > 0);
 }
 
-BOOST_AUTO_TEST_SUITE(coreutils)
+BOOST_AUTO_TEST_SUITE(coreutils) // (coreutils 9.12)
 // ls
 BOOST_AUTO_TEST_CASE(ls) {
     vector<string> expected_short = {
@@ -427,7 +427,7 @@ BOOST_AUTO_TEST_SUITE_END()
 
 
 BOOST_AUTO_TEST_SUITE(base)
-// bzip2
+// bzip2 (1.0.8)
 BOOST_AUTO_TEST_CASE(bzip2) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -461,7 +461,7 @@ BOOST_AUTO_TEST_CASE(bzip2) {
     check_cases(cases);
 }
 
-// grep 
+// grep (3.12-modified)
 BOOST_AUTO_TEST_CASE(grep) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -511,7 +511,7 @@ BOOST_AUTO_TEST_CASE(grep) {
     check_cases(cases);
 }
 
-// file
+// file (5.48)
 BOOST_AUTO_TEST_CASE(file) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -555,43 +555,7 @@ BOOST_AUTO_TEST_CASE(file) {
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(network)
-// netstat 
-BOOST_AUTO_TEST_CASE(netstat) {
-    vector<string> expected_short = {
-        // " ", " ", " ", " ",
-        "-r", "-g", "-i", "-M",
-        "-s", "-v", "-W", "-n",
-        " ", " ", " ", "-A",
-        "-c", "-e", "-o", "-p",
-        "-l", "-a", "-F", "-C"
-    };
-    vector<string> expected_long = {
-        "--route", "--groups", "--interfaces", "--masquerade",
-        "--statistics", "--verbose", "--wide", "--numeric",
-        "--numeric-hosts", "--numeric-ports", "--numeric-users", "--protocol=family",
-        "--continuous", "--extend", "--timers", "--program",
-        "--listening", "--all", " ", " "
-    };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s netstat", expected_short},
-        {"flag -l netstat", expected_long},
-        {"flag -m netstat", expected_mixed},
-        {"flag -M netstat", expected_mixed_only},
-    };
-    check_cases(cases);
-}
-
-// ifconfig
+// ifconfig (net-tools 2.10)
 BOOST_AUTO_TEST_CASE(ifconfig) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -619,7 +583,7 @@ BOOST_AUTO_TEST_CASE(ifconfig) {
     check_cases(cases);
 }
 
-// arp 
+// arp (net-tools 2.10)
 BOOST_AUTO_TEST_CASE(arp) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -649,7 +613,7 @@ BOOST_AUTO_TEST_CASE(arp) {
     check_cases(cases);
 }
 
-// tcpdump
+// tcpdump (4.99.7)
 BOOST_AUTO_TEST_CASE(tcpdump) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -707,7 +671,7 @@ BOOST_AUTO_TEST_CASE(tcpdump) {
     check_cases(cases);
 }
 
-// ping 
+// ping (iputils 20250605)
 BOOST_AUTO_TEST_CASE(ping) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -753,7 +717,7 @@ BOOST_AUTO_TEST_CASE(ping) {
     check_cases(cases);
 }
 
-// traceroute
+// traceroute (2.1.6)
 BOOST_AUTO_TEST_CASE(traceroute) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -793,6 +757,160 @@ BOOST_AUTO_TEST_CASE(traceroute) {
         {"flag -l traceroute", expected_long},
         {"flag -m traceroute", expected_mixed},
         {"flag -M traceroute", expected_mixed_only},
+    };
+    check_cases(cases);
+}
+
+// netstat (net-tools 2.10)
+BOOST_AUTO_TEST_CASE(netstat) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-r", "-g", "-i", "-M",
+        "-s", "-v", "-W", "-n",
+        " ", " ", " ", "-A",
+        "-c", "-e", "-o", "-p",
+        "-l", "-a", "-F", "-C"
+    };
+    vector<string> expected_long = {
+        "--route", "--groups", "--interfaces", "--masquerade",
+        "--statistics", "--verbose", "--wide", "--numeric",
+        "--numeric-hosts", "--numeric-ports", "--numeric-users", "--protocol=family",
+        "--continuous", "--extend", "--timers", "--program",
+        "--listening", "--all", " ", " "
+    };
+    BOOST_TEST(expected_short.size() == expected_long.size());
+
+    vector<string> expected_mixed = {};
+    vector<string> expected_mixed_only = {};
+    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
+    BOOST_TEST(expected_long.size() == expected_mixed.size());
+
+    remove_spaces(expected_short);
+    remove_spaces(expected_long);
+
+    const vector<pair<const char*, vector<string>>> cases = {
+        {"flag -s netstat", expected_short},
+        {"flag -l netstat", expected_long},
+        {"flag -m netstat", expected_mixed},
+        {"flag -M netstat", expected_mixed_only},
+    };
+    check_cases(cases);
+}
+
+// nc (1.101)
+BOOST_AUTO_TEST_CASE(nc) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-4", "-6", "-b", "-C",
+        "-D", "-d", "-F", "-h",
+        "-I length", "-i interval", "-k", "-l",
+        "-M ttl", "-m minttl", "-N", "-n",
+        "-O length", "-P proxy_username", "-p source_port", "-q seconds",
+        "-r", "-S", "-s sourceaddr", "-T keyword",
+        "-t", "-U", "-u", "-V rtable",
+        "-v", "-W recvlimit", "-w timeout", "-X proxy_protocol",
+        "-x proxy_address[:port]", "-Z", "-z" 
+    };
+    vector<string> expected_long = {
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " "
+    };
+    BOOST_TEST(expected_short.size() == expected_long.size());
+
+    vector<string> expected_mixed = {};
+    vector<string> expected_mixed_only = {};
+    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
+    BOOST_TEST(expected_long.size() == expected_mixed.size());
+
+    remove_spaces(expected_short);
+    remove_spaces(expected_long);
+
+    const vector<pair<const char*, vector<string>>> cases = {
+        {"flag -s nc", expected_short},
+        {"flag -l nc", expected_long},
+        {"flag -m nc", expected_mixed},
+        {"flag -M nc", expected_mixed_only},
+    };
+    check_cases(cases);
+}
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(other)
+// git (2.56.0)
+BOOST_AUTO_TEST_CASE(git) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-v", "-h", "-C <path>", "-c <name>=<value>",
+        " ", " ", " ", " ",
+        " ", "-p", "-P", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " "
+    };
+    vector<string> expected_long = {
+        "--version", "--help", " ", " ",
+        "--config-env=<name>=<envvar>", "--exec-path[=<path>]", "--html-path", "--man-path",
+        "--info-path", "--paginate", "--no-pager", "--git-dir=<path>",
+        "--work-tree=<path>", "--namespace=<path>", "--bare", "--no-replace-objects",
+        "--no-lazy-fetch", "--no-optional-locks", "--no-advice", "--literal-pathspecs",
+        "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs", "--list-cmds=<group>[,<group>...]",
+        "--attr-source=<tree-ish>"
+    };
+    BOOST_TEST(expected_short.size() == expected_long.size());
+
+    vector<string> expected_mixed = {};
+    vector<string> expected_mixed_only = {};
+    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
+    BOOST_TEST(expected_long.size() == expected_mixed.size());
+
+    remove_spaces(expected_short);
+    remove_spaces(expected_long);
+
+    const vector<pair<const char*, vector<string>>> cases = {
+        {"flag -s git", expected_short},
+        {"flag -l git", expected_long},
+        {"flag -m git", expected_mixed},
+        {"flag -M git", expected_mixed_only},
+    };
+    check_cases(cases);
+}
+
+// docker (29.9.2)
+BOOST_AUTO_TEST_CASE(docker) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", " ", "-D", "-H",
+        "-l", " ", " ", " ",
+        " ", " ", "-v"
+    };
+    vector<string> expected_long = {
+        "--help", "--config=\"\"", "--debug=true|false", "--host=[unix:///var/run/docker.sock]",
+        "--log-level=\"debug|info|warn|error|fatal\"", "--tls=true|false", "--tlscacert=~/.docker/ca.pem", "--tlscert=~/.docker/cert.pem", 
+        "--tlskey=~/.docker/key.pem", "--tlsverify=true|false", "--version=true|false"
+    };
+    BOOST_TEST(expected_short.size() == expected_long.size());
+
+    vector<string> expected_mixed = {};
+    vector<string> expected_mixed_only = {};
+    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
+    BOOST_TEST(expected_long.size() == expected_mixed.size());
+
+    remove_spaces(expected_short);
+    remove_spaces(expected_long);
+
+    const vector<pair<const char*, vector<string>>> cases = {
+        {"flag -s docker", expected_short},
+        {"flag -l docker", expected_long},
+        {"flag -m docker", expected_mixed},
+        {"flag -M docker", expected_mixed_only},
     };
     check_cases(cases);
 }

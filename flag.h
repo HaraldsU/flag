@@ -158,12 +158,12 @@ void get_commands(A & commands, std::string man_page) {
     std::string reg_short {R"(
         # SHORT
         (
-            (?:-[\#\w]+)
+            (?:-[#\w]+)
             (?:-\w+)*
             (?:
                 [ ]?
                 (?:
-                    (?:[\w\[\]_]|
+                    (?:[\w\[\]_:=<>]|
                         [ ](?![ ]))|
                         ,(?![ \-])|
                         \-(?![\-])
@@ -186,8 +186,8 @@ void get_commands(A & commands, std::string man_page) {
             (?:
                 (?:=|[ ](?!\-))
                 (?:
-                    [\w\[\]\{\}|+\-=]|
-                    ,(?![ ])
+                    [\-\w\[\]{}|+=<>."/~]|
+                    [,:](?![ ])
                 )+
             )?
         )
@@ -208,6 +208,7 @@ void get_commands(A & commands, std::string man_page) {
         # END
         (?=
            $|
+           :[ ]|
            (?:[ ]|,[ ])-+|
            [ ]{2,}\w|
            ,[ ]-\w{2,}|
