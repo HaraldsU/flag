@@ -227,7 +227,7 @@ BOOST_AUTO_TEST_CASE(head) {
         "-z", " ", " "
     };
     vector<string> expected_long = {
-        "--bytes=[-]NUM", "--lines=[-]NUM", "--quiet", "--verbose",
+        "--bytes=[-]NUM", "--lines=[-]NUM", "--quiet", "--verbose", // -q, --quiet, --silent ???
         "--zero-terminated", "--help", "--version"
     };
     BOOST_TEST(expected_short.size() == expected_long.size());
@@ -260,7 +260,7 @@ BOOST_AUTO_TEST_CASE(tail) {
     };
     vector<string> expected_long = {
         "--bytes=[+]NUM", "--debug", "--follow[={name|descriptor}]", " ",
-        "--lines=[+]NUM", "--max-unchanged-stats=N", "--pid=PID", "--quiet",
+        "--lines=[+]NUM", "--max-unchanged-stats=N", "--pid=PID", "--quiet", // --quiet, --silent ???
         "--retry", "--sleep-interval=N", "--verbose", "--zero-terminated",
         "--help", "--version"
     };
@@ -294,7 +294,7 @@ BOOST_AUTO_TEST_CASE(date) {
     vector<string> expected_long = {
         "--date=STRING", "--debug", "--file=DATEFILE", "--iso-8601[=FMT]",
         "--resolution", "--rfc-email", "--rfc-3339=FMT", "--reference=FILE",
-        "--set=STRING", "--utc", "--help", "--version",
+        "--set=STRING", "--utc", "--help", "--version" // -u, --utc, --universal ???
     };
     BOOST_TEST(expected_short.size() == expected_long.size());
 
@@ -435,7 +435,9 @@ BOOST_AUTO_TEST_CASE(bzip2) {
     vector<string> expected_long = {
         "--stdout", "--decompress", "--compress", "--test",
         "--force", "--keep", "--small", "--quiet",
-        "--verbose", "--license", " ", "--repetitive-fast"
+        "--verbose", "--license", " ", "--repetitive-fast" 	// -L --license -V --version ???
+															// -1 (or --fast) to -9 (or --best) ???
+															// --repetitive-fast --repetitive-best ???
     };
     BOOST_TEST(expected_short.size() == expected_long.size());
 
@@ -477,8 +479,8 @@ BOOST_AUTO_TEST_CASE(grep) {
         "--help", "--version", "--extended-regexp", "--fixed-strings",
         "--basic-regexp", "--perl-regexp", "--regexp=PATTERNS", "--file=FILE",
         "--ignore-case", "--no-ignore-case", "--invert-match", "--word-regexp",
-        "--line-regexp", "--count", "--color[=WHEN]", "--files-without-match",
-        "--files-with-matches", "--max-count=NUM", "--only-matching", "--quiet",
+        "--line-regexp", "--count", "--color[=WHEN]", "--files-without-match", // --color[=WHEN], --colour[=WHEN] ???
+        "--files-with-matches", "--max-count=NUM", "--only-matching", "--quiet", // -q, --quiet, --silent ???
         "--no-messages", "--byte-offset", "--with-filename", "--no-filename",
         "--label=LABEL", "--line-number", "--initial-tab", "--null",
         "--after-context=NUM", "--before-context=NUM", " ", "--group-separator=SEP", // -C NUM, -NUM, --context=NUM ???
@@ -523,7 +525,7 @@ BOOST_AUTO_TEST_CASE(file) {
         "--apple", "--brief", "--compile", "--checking-printout",
         " ", " ", "--exclude testname", "--exclude-quiet",
         "--extension", "--separator separator", "--files-from namefile", "--no-dereference",
-        "--mime", "--mime-type", "--keep-going", "--list",
+        "--mime", "--mime-type", "--keep-going", "--list", // --mime-type, --mime-encoding ???
         "--dereference", "--magic-file magicfiles", "--no-pad", "--no-buffer",
         "--preserve-date", "--parameter name=value", "--raw", "--special-files",
         "--no-sandbox", "--version", "--uncompress", "--uncompress-noreport",
