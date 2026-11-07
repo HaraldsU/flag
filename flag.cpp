@@ -54,7 +54,7 @@ void print_sub_matches_debug(boost::smatch sm) {
             cout << "s[" << i << "]: " << sm[i] << endl;
         }
     }
-    cout << endl;
+    // cout << endl;
 }
 // DEBUGGING
 

@@ -70,42 +70,68 @@ void add_commands(A & commands, std::string man_page, std::string regx) {
         if (is_debug) print_sub_matches_debug(sm); // DEBUG
 
         if (mode == Mode::Short) { 
-            if (sm[4].matched) command = sm[4];      // LS
-            else if (sm[3].matched) command = sm[3]; // SHORT OR SL
-            else continue;
+            if (sm[4].matched) {
+                if (is_debug) std::cout << "LS" << std::endl;
+                command = sm[4];
+            }
+            else if (sm[3].matched) {
+                if (is_debug) std::cout << "SHORT OR SL" << std::endl;
+                command = sm[3];
+            }
+            else { 
+                if (is_debug) std::cout << "NO MATCH" << std::endl;
+                continue;
+            }
             flag_count[Mode::Short]++;
         }
 
         else if (mode == Mode::Long) {
-            if (sm[3].matched) command = sm[3];      // SL
-            else if (sm[4].matched) command = sm[4]; // LONG OR LS
-            else continue;
+            if (sm[3].matched) {
+                if (is_debug) std::cout << "SL" << std::endl;
+                command = sm[3];
+            }
+            else if (sm[4].matched) {
+                if (is_debug) std::cout << "LONG OR LS" << std::endl;
+                command = sm[4];
+            }
+            else {
+                if (is_debug) std::cout << "NO MATCH" << std::endl;
+                continue;
+            }
             flag_count[Mode::Long]++;
         } 
 
         else if (mode == Mode::Mixed) {
-            if (sm[5].matched) {                    // LS
+            if (sm[5].matched) {
+                if (is_debug) std::cout << "LS" << std::endl;
                 command = sm[7] + "," + sm[6];
                 flag_count[Mode::Mixed]++;
             }
-            else if (sm[2].matched) {                // SL
+            else if (sm[2].matched) {
+                if (is_debug) std::cout << "SL" << std::endl;
                 command = sm[3] + "," + sm[4];
                 flag_count[Mode::Mixed]++;
             }
             else if (!is_mixed_only) {
-                if (sm[8].matched) {                // SHORT
+                if (sm[8].matched) {
+                    if (is_debug) std::cout << "SHORT" << std::endl;
                     command = sm[8];
                     flag_count[Mode::Short]++;
                 }
-                else if (sm[10].matched) {           // LONG
+                else if (sm[10].matched) {
+                    if (is_debug) std::cout << "LONG" << std::endl;
                     command = sm[10];
                     flag_count[Mode::Long]++;
                 }
-                else continue;
+                else {
+                    if (is_debug) std::cout << "NO MATCH" << std::endl;
+                    continue;
+                }
             }
             else continue;
         } else throw std::string{"Invalid flag notation (expected short, long or mixed)"};
 
+        if (is_debug) std::cout << std::endl;
         bool found = find(commands.begin(), commands.end(), command) != commands.end();
         if (!found) {
             if (is_reverse == false) commands.insert(commands.end(), command);
@@ -132,9 +158,17 @@ void get_commands(A & commands, std::string man_page) {
     std::string reg_short {R"(
         # SHORT
         (
-            (?:-\w+)
+            (?:-[\#\w]+)
             (?:-\w+)*
-            (?:[\s\[]\w+\]?)?
+            (?:
+                [ ]?
+                (?:
+                    (?:[\w\[\]_]|
+                        [ ](?![ ]))|
+                        ,(?![ \-])|
+                        \-(?![\-])
+                )+
+            )?
         )
     )"};
 
@@ -150,11 +184,11 @@ void get_commands(A & commands, std::string man_page) {
             (?:-\w+)*
             (?:\[)?
             (?:
-                (?:=|[ ])
+                (?:=|[ ](?!\-))
                 (?:
-                    (?:[^-\s,]+)|
-                    (?:\[.\]\w+)
-                )
+                    [\w\[\]\{\}|+\-=]|
+                    ,(?![ ])
+                )+
             )?
         )
     )"};
@@ -162,6 +196,7 @@ void get_commands(A & commands, std::string man_page) {
     std::string reg_sep {R"(
         # SEP
         (?:
+            \n[ ]{3,}|
             [ |, ](?=--)|
             [ ]-\w|
             [^-\w\n]{2,}|
