@@ -1,7 +1,7 @@
 #define BOOST_TEST_MODULE Flag 
+#include "flag.h"
 #include <boost/test/included/unit_test.hpp>
 #include <wordexp.h>
-#include "flag.h"
 
 using namespace std;
 
@@ -28,6 +28,13 @@ void remove_spaces(vector<string> & v) {
     v.erase(std::remove(v.begin(), v.end(), " "), v.end());
 }
 
+struct CaptureCout {
+    ostringstream sink;
+    streambuf* old = cout.rdbuf(sink.rdbuf());
+    ~CaptureCout() { cout.rdbuf(old); }
+    string str() const { return sink.str(); }
+};
+
 struct Input {
     Input (const char * command) {
         BOOST_REQUIRE(wordexp(command, &w, WRDE_NOCMD) == 0);
@@ -53,23 +60,85 @@ struct Args {
         set_program_options(input.ac, input.av);
     }
 
-    vector<string> get_command_flags(const string command, const string man_page) {
+    vector<string> get_command_flags(
+        const string command, 
+        const string man_page
+    ) {
         reset_globals_and_set_options(command.c_str());
         vector<string> actual {};
         get_flags(actual, man_page);
         return actual;
     }
 
-    void test_modes(
+    void test_flags(
+        string com, 
+        string man_page, 
+        vector<string> exp,
+        vector<string> expected_short, 
+        vector<string> expected_long,
+        vector<string> expected_mixed,
+        vector<string> expected_mixed_only 
+    ) {
+        BOOST_TEST_CONTEXT("command: " << com) {
+            if (exp.size() == 0) BOOST_CHECK_THROW(get_command_flags(com, man_page), string);
+            else {
+                auto actual = get_command_flags(com, man_page);
+                // Test --[s]hort, --[l]ong, --[m]ixed and --[M]ixed-only flags
+                test_modes(exp, actual);
+
+                // Test -S|--sort flag
+                test_sort(actual);
+
+                // Test --[r]everse flag
+                test_reverse(actual);
+
+                // Test --[w]ord-count flag
+                test_flag_count(com, expected_short, expected_long, expected_mixed, expected_mixed_only);
+            }
+        }
+    }
+
+    void test_modes(vector<string> exp, vector<string> actual) {
+        BOOST_CHECK_EQUAL_COLLECTIONS(actual.begin(), actual.end(), exp.begin(), exp.end());
+        if (actual.size() < exp.size()) BOOST_TEST_MESSAGE("missing at end: " << exp[actual.size()]);
+        if (actual.size() > exp.size()) BOOST_TEST_MESSAGE("extra at end: " << actual[exp.size()]);
+    }
+
+    // Not really testing if the sort happens but I would need ground truth values to do that ...
+    void test_sort(vector<string> actual) {
+        set<string, ilexic> sorted;
+        for (auto el : actual) {
+            sorted.insert(el);
+        }
+        BOOST_CHECK_EQUAL(actual.size(), sorted.size());
+    }
+
+    void test_reverse(vector<string> actual) {
+        IS_REVERSE = true;
+
+        vector<string> reversed;
+        for (auto el : actual) {
+            reversed.insert(reversed.begin(), el);
+        }
+        BOOST_CHECK_EQUAL(actual.size(), reversed.size());
+        BOOST_CHECK_EQUAL(actual[0], reversed[reversed.size() - 1]);
+
+        IS_REVERSE = false;
+    }
+
+    void test_delimiter() {
+
+    }
+
+    void for_all_modes(
         const string command, 
         const string man_page,
         vector<string> expected_short, 
-        vector<string> expected_long
+        vector<string> expected_long,
+        vector<string> expected_mixed,
+        vector<string> expected_mixed_only 
     ) {
         BOOST_TEST(expected_short.size() == expected_long.size());
-        vector<string> expected_mixed = {};
-        vector<string> expected_mixed_only = {};
-        make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
         BOOST_TEST(expected_long.size() == expected_mixed.size());
 
         remove_spaces(expected_short);
@@ -83,20 +152,37 @@ struct Args {
         };
 
         for (const auto& [com, exp] : cases) {
-            BOOST_TEST_CONTEXT("command: " << com) {
-                if (exp.size() == 0) BOOST_CHECK_THROW(get_command_flags(com, man_page), string);
-                else {
-                    auto actual = get_command_flags(com, man_page);
-                    BOOST_CHECK_EQUAL_COLLECTIONS(actual.begin(), actual.end(), exp.begin(), exp.end());
-                    if (actual.size() < exp.size()) BOOST_TEST_MESSAGE("missing at end: " << exp[actual.size()]);
-                    if (actual.size() > exp.size()) BOOST_TEST_MESSAGE("extra at end: " << actual[exp.size()]);
-                }
-            }
+            test_flags(com, man_page, exp, expected_short, expected_long, expected_mixed, expected_mixed_only);
         }
     }
 
     void test_title(const string title, const string man_page) {
         BOOST_CHECK_EQUAL(print_title(man_page), title);
+    }
+
+    void test_flag_count(
+        string command,
+        vector<string> expected_short, 
+        vector<string> expected_long,
+        vector<string> expected_mixed,
+        vector<string> expected_mixed_only
+    ) {
+        if (command.find("flag -s ") != std::string::npos) {
+            BOOST_CHECK_EQUAL(expected_short.size(), FLAG_COUNT[Mode::Short]);
+        }
+        else if (command.find("flag -l ") != std::string::npos) {
+            BOOST_CHECK_EQUAL(expected_long.size(), FLAG_COUNT[Mode::Long]);
+        }
+        else if (command.find("flag -m ") != std::string::npos) {
+            BOOST_CHECK_EQUAL(
+                expected_mixed.size(), 
+                FLAG_COUNT[Mode::Short] + FLAG_COUNT[Mode::Long] + FLAG_COUNT[Mode::Mixed]
+            );
+        }
+        else if (command.find("flag -M ") != std::string::npos) {
+            BOOST_CHECK_EQUAL(expected_mixed_only.size(), FLAG_COUNT[Mode::Mixed]);
+        }
+        else cout << "FLAG COUNT TEST ERROR" << endl;
     }
 
     void test_command (
@@ -106,10 +192,13 @@ struct Args {
         vector<string> expected_long
     ) {
         reset_globals_and_set_options(command);
-        auto man_page = load_man_page();
+        auto man_page = set_man_page();
 
-        // Test -s, -l, -m and -M flags
-        test_modes(command, man_page, expected_short, expected_long);
+        vector<string> expected_mixed = {};
+        vector<string> expected_mixed_only = {};
+        make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
+
+        for_all_modes(command, man_page, expected_short, expected_long, expected_mixed, expected_mixed_only);
 
         // Test -t flag
         test_title(title, man_page);
@@ -118,9 +207,43 @@ struct Args {
 
 BOOST_FIXTURE_TEST_SUITE(flag_tests, Args)
 
-// Test -v flag
+// Test --[v]ersion flag
 BOOST_AUTO_TEST_CASE(version) {
-    BOOST_CHECK_EQUAL(print_program_version(), 0);
+    BOOST_CHECK_EQUAL(print_program_version(), 1);
+}
+
+// Test --[h]elp flag
+BOOST_AUTO_TEST_CASE(help) {
+    BOOST_CHECK_EQUAL(print_help(boost::program_options::options_description{}), 1);
+}
+
+// Test -D|--debug flag
+BOOST_AUTO_TEST_CASE(debug) {
+    BOOST_CHECK_EQUAL(print_debug(), 0);
+}
+
+// Test --[d]elimiter flag
+BOOST_AUTO_TEST_CASE(delimiter) {
+    vector<pair<string, string>> cases {
+        {"\n", {}},
+        {"\t", {}},
+        {"; ", {}},
+        {"aboba", {}}
+    };
+
+    for (auto & [del, out] : cases) {
+        DELIMITER = del;
+        string command {"flag -d '" + DELIMITER + "' pwd"};
+        reset_globals_and_set_options(command);
+        auto man_page = set_man_page();
+        auto actual1 = get_command_flags(command, man_page);
+        {
+            CaptureCout capture;
+            print_flags(actual1, man_page);
+            out = capture.str();
+        }
+        BOOST_TEST(out.find(del));
+    }
 }
 
 BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
@@ -137,11 +260,11 @@ BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
     BOOST_TEST(input.av[input.ac] == nullptr);
 }
 
-BOOST_AUTO_TEST_CASE(load_man_page_ls) {
+BOOST_AUTO_TEST_CASE(set_man_page_ls) {
     string command = "flag -s --delimiter '\n' ls";
     Input input(command.c_str());
     set_program_options(input.ac, input.av);
-    auto man_page = load_man_page();
+    auto man_page = set_man_page();
     BOOST_TEST(man_page.length() > 0);
 }
 
@@ -598,7 +721,7 @@ BOOST_AUTO_TEST_CASE(netstat) {
         "--listening", "--all", " ", " "
     };
     string command {"netstat"};
-    string title {""};
+    string title {"netstat - Print network connections, routing tables, interface statistics, masquerade connections, and multicast memberships"};
     test_command(command, title, expected_short, expected_long);
 }
 

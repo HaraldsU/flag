@@ -1,10 +1,6 @@
 #pragma once
-#include <ios>
-#include <set>
 #include <tuple>
 #include <string>
-#include <variant>
-#include <stdio.h>
 #include <unistd.h>
 #include <iostream>
 #include <boost/regex.hpp>
@@ -12,30 +8,32 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
-inline boost::program_options::variables_map vm;
 
 enum class Mode { Short, Long, Mixed};
-inline const std::unordered_map<std::string, Mode> kModes {
-    {"short", Mode::Short},
-    {"long",  Mode::Long},
-    {"mixed",  Mode::Mixed},
-    {"mixed-only",  Mode::Mixed}
+inline const std::unordered_map<std::string, Mode> kMODES {
+    {"short"      , Mode::Short},
+    {"long"       , Mode::Long },
+    {"mixed"      , Mode::Mixed},
+    {"mixed-only" , Mode::Mixed}
 };
 
-inline Mode mode                                = Mode::Mixed;
-inline bool is_mixed_only                       = false;
-inline bool is_reverse                          = false;
-inline int  enclose_count                       = 2;
-inline bool is_word_count                       = false;
-inline bool is_title                            = false;
-inline bool is_sort                             = false;
-inline bool is_debug                            = false;
-inline std::unordered_map<Mode, int> flag_count = {};
+inline boost::program_options::variables_map VM = {};
+inline Mode MODE                                = Mode::Mixed;
+inline bool IS_MIXED_ONLY                       = false;
+inline bool IS_REVERSE                          = false;
+inline int  ENCLOSE_COUNT                       = 2;
+inline bool IS_WORD_COUNT                       = false;
+inline bool IS_TITLE                            = false;
+inline bool IS_SORT                             = false;
+inline bool IS_DEBUG                            = false;
+inline std::string DELIMITER                    = "\n";
+inline std::unordered_map<Mode, int> FLAG_COUNT = {};
 
 int set_program_options(int end,char ** av);
-void print_debug();
+int print_debug();
 int print_program_version();
-std::string load_man_page();
+int print_help(boost::program_options::options_description desc);
+std::string set_man_page();
 std::string set_delimiter();
 
 struct ilexic {
@@ -53,7 +51,7 @@ struct ilexic {
     bool operator()(const std::string & a, const std::string & b) const {
         std::string x = strip_start(a);
         std::string y = strip_start(b);
-        if (is_reverse == true) return make_tuple(lower(y), y, b) < make_tuple(lower(x), x, a);
+        if (IS_REVERSE == true) return make_tuple(lower(y), y, b) < make_tuple(lower(x), x, a);
         else return make_tuple(lower(x), x, a) < make_tuple(lower(y), y, b);
     }
 };
@@ -68,74 +66,74 @@ void add_flags(A & commands, std::string man_page, std::string regx) {
         std::string command {};
         auto sm = *mr;
 
-        if (is_debug) print_sub_matches_debug(sm); // DEBUG
+        if (IS_DEBUG) print_sub_matches_debug(sm); // DEBUG
 
-        if (mode == Mode::Short) { 
+        if (MODE == Mode::Short) { 
             if (sm[4].matched) {
-                if (is_debug) std::cout << "LS" << std::endl;
+                if (IS_DEBUG) std::cout << "LS" << std::endl;
                 command = sm[4];
             }
             else if (sm[3].matched) {
-                if (is_debug) std::cout << "SHORT OR SL" << std::endl;
+                if (IS_DEBUG) std::cout << "SHORT OR SL" << std::endl;
                 command = sm[3];
             }
             else { 
-                if (is_debug) std::cout << "NO MATCH" << std::endl;
+                if (IS_DEBUG) std::cout << "NO MATCH" << std::endl;
                 continue;
             }
-            flag_count[Mode::Short]++;
+            FLAG_COUNT[Mode::Short]++;
         }
 
-        else if (mode == Mode::Long) {
+        else if (MODE == Mode::Long) {
             if (sm[3].matched) {
-                if (is_debug) std::cout << "SL" << std::endl;
+                if (IS_DEBUG) std::cout << "SL" << std::endl;
                 command = sm[3];
             }
             else if (sm[4].matched) {
-                if (is_debug) std::cout << "LONG OR LS" << std::endl;
+                if (IS_DEBUG) std::cout << "LONG OR LS" << std::endl;
                 command = sm[4];
             }
             else {
-                if (is_debug) std::cout << "NO MATCH" << std::endl;
+                if (IS_DEBUG) std::cout << "NO MATCH" << std::endl;
                 continue;
             }
-            flag_count[Mode::Long]++;
+            FLAG_COUNT[Mode::Long]++;
         } 
 
-        else if (mode == Mode::Mixed) {
+        else if (MODE == Mode::Mixed) {
             if (sm[5].matched) {
-                if (is_debug) std::cout << "LS" << std::endl;
+                if (IS_DEBUG) std::cout << "LS" << std::endl;
                 command = sm[7] + "," + sm[6];
-                flag_count[Mode::Mixed]++;
+                FLAG_COUNT[Mode::Mixed]++;
             }
             else if (sm[2].matched) {
-                if (is_debug) std::cout << "SL" << std::endl;
+                if (IS_DEBUG) std::cout << "SL" << std::endl;
                 command = sm[3] + "," + sm[4];
-                flag_count[Mode::Mixed]++;
+                FLAG_COUNT[Mode::Mixed]++;
             }
-            else if (!is_mixed_only) {
+            else if (!IS_MIXED_ONLY) {
                 if (sm[8].matched) {
-                    if (is_debug) std::cout << "SHORT" << std::endl;
+                    if (IS_DEBUG) std::cout << "SHORT" << std::endl;
                     command = sm[8];
-                    flag_count[Mode::Short]++;
+                    FLAG_COUNT[Mode::Short]++;
                 }
                 else if (sm[10].matched) {
-                    if (is_debug) std::cout << "LONG" << std::endl;
+                    if (IS_DEBUG) std::cout << "LONG" << std::endl;
                     command = sm[10];
-                    flag_count[Mode::Long]++;
+                    FLAG_COUNT[Mode::Long]++;
                 }
                 else {
-                    if (is_debug) std::cout << "NO MATCH" << std::endl;
+                    if (IS_DEBUG) std::cout << "NO MATCH" << std::endl;
                     continue;
                 }
             }
             else continue;
         } else throw std::string{"Invalid flag notation (expected short, long or mixed)"};
 
-        if (is_debug) std::cout << std::endl;
+        if (IS_DEBUG) std::cout << std::endl;
         bool found = find(commands.begin(), commands.end(), command) != commands.end();
         if (!found) {
-            if (is_reverse == false) commands.insert(commands.end(), command);
+            if (IS_REVERSE == false) commands.insert(commands.end(), command);
             else commands.insert(commands.begin(), command);
         }
     }
@@ -251,7 +249,7 @@ void get_flags(A & commands, std::string man_page) {
         ")"
     ;
 
-    if (mode == Mode::Short) {
+    if (MODE == Mode::Short) {
         reg_final = 
             reg_start +
             "(" +           // (1)
@@ -261,7 +259,7 @@ void get_flags(A & commands, std::string man_page) {
             ")" +
             reg_end
         ;
-    } else if (mode == Mode::Long) {
+    } else if (MODE == Mode::Long) {
         reg_final = 
             reg_start +
             "(" +           // (1)
@@ -271,7 +269,7 @@ void get_flags(A & commands, std::string man_page) {
             ")" +
             reg_end
         ;
-    } else if (mode == Mode::Mixed) {
+    } else if (MODE == Mode::Mixed) {
         reg_final = 
             reg_start +
             "(" +                       // (1)
@@ -297,7 +295,7 @@ void get_flags(A & commands, std::string man_page) {
 
 template <typename A>
 std::vector<std::string> get_n_longest_flags(const A commands) {
-    int n = vm["column"].as<int>();
+    int n = VM["column"].as<int>();
     std::vector<std::string> sorted(commands.begin(), commands.end());
     sort(sorted.begin(), sorted.end(),
         [](const std::string& a, const std::string& b) { return a.size() > b.size(); }
@@ -319,9 +317,10 @@ void add_colors(std::string & output,int pipe_pos);
 void add_enclosing(std::string & output);
 
 template <typename A>
-void print_flags_helper(A commands, std::string delim) {
+void print_flags_helper(A commands) {
     auto lf = get_n_longest_flags(commands);
     int longest_flag_n = lf[0].length();
+    auto delim = DELIMITER;
 
     // int char_count = 0;
     // for (auto i : lf) char_count += i.length();
@@ -332,8 +331,8 @@ void print_flags_helper(A commands, std::string delim) {
     // delim = "";
 
     int count = 0;
-    int extra_padding = 2 + enclose_count;
-    int col_n = vm["column"].as<int>();
+    int extra_padding = 2 + ENCLOSE_COUNT;
+    int col_n = VM["column"].as<int>();
 
     for (auto iter = commands.begin(); iter != commands.end(); iter++) {
         if (std::next(iter) == commands.end()) delim = "";
@@ -341,9 +340,9 @@ void print_flags_helper(A commands, std::string delim) {
         std::string command = *iter;
         std::string output  = "";
         int pipe_pos   = 0;
-        if (enclose_count != 0) add_enclosing(command);
+        if (ENCLOSE_COUNT != 0) add_enclosing(command);
 
-        if (mode == Mode::Mixed) {
+        if (MODE == Mode::Mixed) {
             int i = 0;
             for (auto c : command) {
                 if (c != ',') {
@@ -359,7 +358,7 @@ void print_flags_helper(A commands, std::string delim) {
         else output = command;
 
         auto tmp_output = output;
-        auto when = vm["color"].as<std::string>();
+        auto when = VM["color"].as<std::string>();
         if (when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
 
         if (col_n > 1) {
@@ -378,25 +377,25 @@ void print_flags_helper(A commands, std::string delim) {
 }
 
 template <typename A>
-void print_flags(A commands, std::string delim, std::string man_page) {
-    print_flags_helper(commands, delim);
-    if (is_title) { 
+void print_flags(A commands, std::string man_page) {
+    print_flags_helper(commands);
+    if (IS_TITLE) { 
         auto title = print_title(man_page); 
         std::cout << "NAME: " << title << std::endl;
     }
-    if (is_word_count) print_flag_count();
+    if (IS_WORD_COUNT) print_flag_count();
 }
 
 inline void reset_globals() {
-    vm.clear();
-    mode          = Mode::Mixed;
-    is_mixed_only = false;
-    is_reverse    = false;
-    enclose_count = 2;
-    is_word_count = false;
-    is_title      = false;
-    is_sort       = false;
-    is_debug      = false;
-    flag_count.clear();
+    VM.clear();
+    MODE          = Mode::Mixed;
+    IS_MIXED_ONLY = false;
+    IS_REVERSE    = false;
+    ENCLOSE_COUNT = 2;
+    IS_WORD_COUNT = false;
+    IS_TITLE      = false;
+    IS_SORT       = false;
+    IS_DEBUG      = false;
+    FLAG_COUNT.clear();
 }
 

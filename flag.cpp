@@ -29,23 +29,27 @@ string escape(const string& s) {
     return out;
 }
 
-void print_debug() {
+int print_debug() {
     cout << "DEBUG:" << endl;
-    auto m = int(mode) == 0 ? "short"
-        : int(mode) == 1 ? "long"
+    auto m = int(MODE) == 0 ? "short"
+        : int(MODE) == 1 ? "long"
         : "mixed";
 
-    cout << "Mode: "          << int(mode)     << " (" << m << ")" << endl;
-    cout << "Mixed-only: "    << boolalpha     << is_mixed_only << endl;
-    cout << "Delimiter: "     << "'"           << escape(vm["delimiter"].as<string>()) << "'" << endl;
-    cout << "Sort: "          << boolalpha     << is_sort << endl;
-    cout << "Reverse: "       << boolalpha     << is_reverse << endl;
-    cout << "Word count: "    << boolalpha     << is_word_count << endl;
-    cout << "Title: "         << boolalpha     << is_title      << endl;
-    cout << "Enclose count: " << enclose_count << endl;
-    cout << "Debug: "         << boolalpha     << is_debug   << endl;
+    cout << "Mode: "          << int(MODE)     << " (" << m << ")" << endl;
+    cout << "Mixed-only: "    << boolalpha     << IS_MIXED_ONLY << endl;
+    if (VM.count("DELIMITER")) {
+        cout << "Delimiter: "     << "'"           << escape(VM["DELIMITER"].as<string>()) << "'" << endl;
+    } else cout << "Delimiter: N/A" << endl;
+    cout << "Sort: "          << boolalpha     << IS_SORT << endl;
+    cout << "Reverse: "       << boolalpha     << IS_REVERSE << endl;
+    cout << "Word count: "    << boolalpha     << IS_WORD_COUNT << endl;
+    cout << "Title: "         << boolalpha     << IS_TITLE      << endl;
+    cout << "Enclose count: " << ENCLOSE_COUNT << endl;
+    cout << "Debug: "         << boolalpha     << IS_DEBUG   << endl;
     cout << "Version: "       << version       << endl;
     cout << endl;
+
+    return 0;
 }
 
 void print_sub_matches_debug(boost::smatch sm) {
@@ -54,17 +58,44 @@ void print_sub_matches_debug(boost::smatch sm) {
             cout << "s[" << i << "]: " << sm[i] << endl;
         }
     }
-    // cout << endl;
 }
 // DEBUGGING
 
-int print_program_version() {
-    if (!version.empty()) {
-        cout << "flag " << version << endl;
-        return 0;
-    } else return 1;
+// PRINTING
+int print_help(po::options_description desc) {
+    cout << desc << endl;
+    return 1;
 }
 
+int print_program_version() {
+    cout << "flag " << version << endl;
+    return 1;
+}
+
+void print_flag_count() {
+    cout <<    "COUNT: "
+         <<    "SF: " << FLAG_COUNT[Mode::Short]
+         << " | LF: " << FLAG_COUNT[Mode::Long]
+         << " | MF: " << FLAG_COUNT[Mode::Mixed]
+         << " | TT: " << FLAG_COUNT[Mode::Short] + FLAG_COUNT[Mode::Long] + FLAG_COUNT[Mode::Mixed] << endl;
+}
+
+string print_title(const string man_page) {
+    string regx = R"(
+        (?:^NAME\n\s{2,})\K
+        .*
+        (?=\n)
+    )";
+
+    const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
+    boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
+
+    auto sm = *sr_iterator;
+    return sm[0];
+}
+// PRINTING
+
+// SETTING / ADDING
 int set_program_options(int end, char ** av) {
     po::options_description desc("Usage: flag [flags] [argument]\nFlags", kColumn_width);
     po::options_description hidden("Hidden options");
@@ -116,44 +147,47 @@ int set_program_options(int end, char ** av) {
             .options(all)
             .positional(pos)
             .run();
-        po::store(parsed, vm);
-        po::notify(vm); 
+        po::store(parsed, VM);
+        po::notify(VM); 
 
-        if (vm["help"].as<bool>() or !vm.count("input")) {
-            cout << desc << endl;
-            return 1;
-        }
-        else if (vm["version"].as<bool>()) {
+        if (VM["version"].as<bool>()) {
             return print_program_version();
         }
+        else if (VM["help"].as<bool>() or !VM.count("input")) {
+            return print_help(desc);
+        }
 
-        if (vm["reverse"].as<bool>()) is_reverse = true;
-        if (vm["sort"].as<bool>()) is_sort = true;
-        if (vm["word-count"].as<bool>()) is_word_count = true;
-        if (vm["mixed-only"].as<bool>()) is_mixed_only = true;
-        if (vm["title"].as<bool>()) is_title = true;
-        if (vm["debug"].as<bool>()) is_debug = true;
+        if (VM["reverse"].as<bool>()) IS_REVERSE = true;
+        if (VM["sort"].as<bool>()) IS_SORT = true;
+        if (VM["word-count"].as<bool>()) IS_WORD_COUNT = true;
+        if (VM["mixed-only"].as<bool>()) IS_MIXED_ONLY = true;
+        if (VM["title"].as<bool>()) IS_TITLE = true;
+        if (VM["debug"].as<bool>()) IS_DEBUG = true;
 
-        if (vm.count("enclose")) {
-            if (vm["enclose"].as<string>().length() == 0) enclose_count = 0;
-            else if (vm["enclose"].as<string>().length() == 1) enclose_count = 1;
-            else if (vm["enclose"].as<string>().length() == 2) enclose_count = 2;
+        if (VM.count("delimiter")) {
+            DELIMITER = VM["delimiter"].as<string>();
+        }
+
+        if (VM.count("enclose")) {
+            if (VM["enclose"].as<string>().length() == 0) ENCLOSE_COUNT = 0;
+            else if (VM["enclose"].as<string>().length() == 1) ENCLOSE_COUNT = 1;
+            else if (VM["enclose"].as<string>().length() == 2) ENCLOSE_COUNT = 2;
             else throw string{"Flag '--enclose' excpects 0, 1 or 2 characters in the argument"};
         }
 
-        mode = Mode::Mixed;
+        MODE = Mode::Mixed;
         for (const auto& opt : parsed.options) {
-            auto it = kModes.find(opt.string_key);
-            if (it != kModes.end())
-                mode = it->second;
+            auto it = kMODES.find(opt.string_key);
+            if (it != kMODES.end())
+                MODE = it->second;
         }
     } catch (const po::invalid_command_line_syntax& e) {
         if (e.kind() == po::invalid_command_line_syntax::empty_adjacent_parameter) {
             string opt = e.get_option_name();
             if (opt == "--enclose") {
                 throw string{"Empty value for " + e.get_option_name() + "=, use --enclose '' instead"};
-            } else if (opt == "--delimiter") {
-                throw string{"Empty value for " + e.get_option_name() + "=, use --delimiter '' instead"};
+            } else if (opt == "--DELIMITER") {
+                throw string{"Empty value for " + e.get_option_name() + "=, use --DELIMITER '' instead"};
             }
         }
 
@@ -163,8 +197,8 @@ int set_program_options(int end, char ** av) {
     return 0;
 }
 
-string load_man_page() {
-    auto input = boost::algorithm::join(vm["input"].as<vector<string>>(), " ");
+string set_man_page() {
+    auto input = boost::algorithm::join(VM["input"].as<vector<string>>(), " ");
     string command {"man " + input + " 2>/dev/null | " + "cat"};
     string man_page {};
 
@@ -178,45 +212,10 @@ string load_man_page() {
     return man_page;
 }
 
-string set_delimiter() {
-    if (vm["column"].as<int>() > 1) return "";
-
-    string delim {vm["delimiter"].as<string>()};
-    delim = vm["delimiter"].as<string>();
-    if (delim == "\\n") delim = "\n";
-    else if (delim == "\\t") delim = "\t";
-
-    return delim;
-}
-
-
-void print_flag_count() {
-    cout <<    "COUNT: "
-         <<    "SF: " << flag_count[Mode::Short]
-         << " | LF: " << flag_count[Mode::Long]
-         << " | MF: " << flag_count[Mode::Mixed]
-         << " | TT: " << flag_count[Mode::Short] + flag_count[Mode::Long] + flag_count[Mode::Mixed] << endl;
-}
-
-string print_title(const string man_page) {
-    string regx = R"(
-        (?:^NAME\n\s{2,})\K
-        .*
-        (?=\n)
-    )";
-
-    const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
-    boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
-
-    auto sm = *sr_iterator;
-    // cout << "NAME: " << sm[0] << endl;
-    return sm[0];
-}
-
 void add_colors(string & output, int pipe_pos) {
     // 31: red; 32: green; 33: yellow
     bool is_solo_long = false;
-    if (enclose_count == 0) {
+    if (ENCLOSE_COUNT == 0) {
         (output[1] == '-') ? is_solo_long = true : is_solo_long = false;
     } else {
         (output[2] == '-') ? is_solo_long = true : is_solo_long = false;
@@ -232,7 +231,7 @@ void add_colors(string & output, int pipe_pos) {
         output.insert(pipe_pos, sep);              // [-s{|}--l]
     }
 
-    if (enclose_count != 0) { 
+    if (ENCLOSE_COUNT != 0) { 
         output.insert(output.length() - 1, sep);   // [?|?{]}
         if (!is_solo_long) output.insert(1, s);    // [{-s}|?]
         else output.insert(1, l);                  // [{--l}]
@@ -242,15 +241,16 @@ void add_colors(string & output, int pipe_pos) {
         else output.insert(0, l);                  // {--l}
     }
 
-    if (enclose_count != 0) output.insert(0, sep); // {[}-s|--l]
+    if (ENCLOSE_COUNT != 0) output.insert(0, sep); // {[}-s|--l]
 
     output.insert(0, reset);                       // {}[-s|--l]
     output += reset;                               // [-s|--l]{}
 }
 
 void add_enclosing(string & output) {
-    auto enclose = vm["enclose"].as<string>();
-    if (enclose_count == 1) output = enclose[0] + output + enclose[0];
-    else if (enclose_count == 2) output = enclose[0] + output + enclose[1];
+    auto enclose = VM["enclose"].as<string>();
+    if (ENCLOSE_COUNT == 1) output = enclose[0] + output + enclose[0];
+    else if (ENCLOSE_COUNT == 2) output = enclose[0] + output + enclose[1];
 }
+// SETTING / ADDING
 
