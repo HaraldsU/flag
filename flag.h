@@ -34,7 +34,8 @@ inline std::unordered_map<Mode, int> flag_count = {};
 
 int set_program_options(int end,char ** av);
 void print_debug();
-std::string load_man_page(int ac,char ** av);
+int print_program_version();
+std::string load_man_page();
 std::string set_delimiter();
 
 struct ilexic {
@@ -59,7 +60,7 @@ struct ilexic {
 
 void print_sub_matches_debug(boost::smatch sm);
 template <typename A>
-void add_commands(A & commands, std::string man_page, std::string regx) {
+void add_flags(A & commands, std::string man_page, std::string regx) {
     const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
     boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
 
@@ -141,7 +142,7 @@ void add_commands(A & commands, std::string man_page, std::string regx) {
 }
 
 template <typename A>
-void get_commands(A & commands, std::string man_page) {
+void get_flags(A & commands, std::string man_page) {
     std::string reg_final {};
 
     // netstat has 3 spaces
@@ -289,7 +290,7 @@ void get_commands(A & commands, std::string man_page) {
     // std::cout << "reg_final: " << reg_final << std::endl;
 
     try {
-        add_commands(commands, man_page, reg_final);
+        add_flags(commands, man_page, reg_final);
         if (commands.size() == 0) throw std::string{"No flags found (try flag -m)"};
     } catch (const std::string & e) { throw e; }
 }
@@ -313,73 +314,76 @@ std::vector<std::string> get_n_longest_flags(const A commands) {
 }
 
 void print_flag_count();
-void print_title(std::string man_page);
+std::string print_title(const std::string man_page);
 void add_colors(std::string & output,int pipe_pos);
 void add_enclosing(std::string & output);
 
 template <typename A>
-void print_commands_helper(A commands, std::string delim) {
-auto lf = get_n_longest_flags(commands);
-int longest_flag_n = lf[0].length();
+void print_flags_helper(A commands, std::string delim) {
+    auto lf = get_n_longest_flags(commands);
+    int longest_flag_n = lf[0].length();
 
-// int char_count = 0;
-// for (auto i : lf) char_count += i.length();
-// (kColumn_width < char_count) 
+    // int char_count = 0;
+    // for (auto i : lf) char_count += i.length();
+    // (kColumn_width < char_count) 
     // ? std::cout << "Can NOT fit " << col_n << " columns" << std::endl
     // : std::cout << "CAN fit " << col_n << " columns" << std::endl;
-// std::cout << std::endl;
-// delim = "";
+    // std::cout << std::endl;
+    // delim = "";
 
-int count = 0;
-int extra_padding = 2 + enclose_count;
-int col_n = vm["column"].as<int>();
+    int count = 0;
+    int extra_padding = 2 + enclose_count;
+    int col_n = vm["column"].as<int>();
 
-for (auto iter = commands.begin(); iter != commands.end(); iter++) {
-    if (std::next(iter) == commands.end()) delim = "";
+    for (auto iter = commands.begin(); iter != commands.end(); iter++) {
+        if (std::next(iter) == commands.end()) delim = "";
 
-    std::string command = *iter;
-    std::string output  = "";
-    int pipe_pos   = 0;
-    if (enclose_count != 0) add_enclosing(command);
+        std::string command = *iter;
+        std::string output  = "";
+        int pipe_pos   = 0;
+        if (enclose_count != 0) add_enclosing(command);
 
-    if (mode == Mode::Mixed) {
-        int i = 0;
-        for (auto c : command) {
-            if (c != ',') {
-                output.append(std::string{c});
-                i++;
-            }
-            else {
-                output.append("|");
-                pipe_pos = i;
+        if (mode == Mode::Mixed) {
+            int i = 0;
+            for (auto c : command) {
+                if (c != ',') {
+                    output.append(std::string{c});
+                    i++;
+                }
+                else {
+                    output.append("|");
+                    pipe_pos = i;
+                }
             }
         }
-    }
-    else output = command;
+        else output = command;
 
-    auto tmp_output = output;
-    auto when = vm["color"].as<std::string>();
-    if (when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
+        auto tmp_output = output;
+        auto when = vm["color"].as<std::string>();
+        if (when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
 
-    if (col_n > 1) {
-        std::string offset(longest_flag_n + extra_padding - tmp_output.length(), ' ');
-        std::cout << output << offset << delim;
+        if (col_n > 1) {
+            std::string offset(longest_flag_n + extra_padding - tmp_output.length(), ' ');
+            std::cout << output << offset << delim;
 
-        count++;
-        if (count == col_n) {
-            std::cout << std::endl;
-            count = 0;
+            count++;
+            if (count == col_n) {
+                std::cout << std::endl;
+                count = 0;
+            }
         }
+        else std::cout << output << delim;
     }
-    else std::cout << output << delim;
-}
-std::cout << std::endl;
+    std::cout << std::endl;
 }
 
 template <typename A>
-void print_commands(A commands, std::string delim, std::string man_page) {
-    print_commands_helper(commands, delim);
-    if (is_title) print_title(man_page);
+void print_flags(A commands, std::string delim, std::string man_page) {
+    print_flags_helper(commands, delim);
+    if (is_title) { 
+        auto title = print_title(man_page); 
+        std::cout << "NAME: " << title << std::endl;
+    }
     if (is_word_count) print_flag_count();
 }
 

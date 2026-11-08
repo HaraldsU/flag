@@ -5,62 +5,6 @@
 
 using namespace std;
 
-const static char * in = "flag -s --delimiter '\n' ls";
-
-struct Input {
-    Input (const char * command) {
-        BOOST_REQUIRE(wordexp(command, &w, WRDE_NOCMD) == 0);
-
-        ac = static_cast<int>(w.we_wordc);
-        av = w.we_wordv;
-    }
-    ~Input () {
-        wordfree(&w);
-    }
-
-    int       ac;
-    char**    av;
-    wordexp_t w;
-};
-
-struct Args {
-    Args() { load(in); }
-
-    void load(const char* command) {
-        reset_globals();
-        Input input(command);
-        set_program_options(input.ac, input.av);
-    }
-
-    vector<string> commands_for(const char* command) {
-        load(command);
-
-        Input input(command);
-        string man_page = load_man_page(input.ac, input.av);
-        vector<string> actual;
-        get_commands(actual, man_page);
-        return actual;
-    }
-
-    void check_cases(const vector<pair<const char*, vector<string>>> cases) {
-        for (const auto& [command, expected] : cases) {
-            BOOST_TEST_CONTEXT("command: " << command) {
-                if (expected.size() == 0) BOOST_CHECK_THROW(commands_for("flag -M test"), std::string);
-                else {
-                    auto actual = commands_for(command);
-                    BOOST_CHECK_EQUAL_COLLECTIONS(actual.begin(), actual.end(), expected.begin(), expected.end());
-                    if (actual.size() < expected.size()) BOOST_TEST_MESSAGE("missing at end: " << expected[actual.size()]);
-                    if (actual.size() > expected.size()) BOOST_TEST_MESSAGE("extra at end: " << actual[expected.size()]);
-                }
-            }
-        }
-    }
-};
-
-void remove_spaces(vector<string> & v) {
-    v.erase(std::remove(v.begin(), v.end(), " "), v.end());
-}
-
 void make_mixed_from_short_and_long(
         const vector<string> es, 
         const vector<string> el,
@@ -80,7 +24,104 @@ void make_mixed_from_short_and_long(
     }
 }
 
+void remove_spaces(vector<string> & v) {
+    v.erase(std::remove(v.begin(), v.end(), " "), v.end());
+}
+
+struct Input {
+    Input (const char * command) {
+        BOOST_REQUIRE(wordexp(command, &w, WRDE_NOCMD) == 0);
+
+        ac = static_cast<int>(w.we_wordc);
+        av = w.we_wordv;
+    }
+    ~Input () {
+        wordfree(&w);
+    }
+
+    int       ac;
+    char**    av;
+    wordexp_t w;
+};
+
+struct Args {
+    Args() { }
+
+    void reset_globals_and_set_options(string command) {
+        reset_globals();
+        Input input(("flag " + command).c_str());
+        set_program_options(input.ac, input.av);
+    }
+
+    vector<string> get_command_flags(const string command, const string man_page) {
+        reset_globals_and_set_options(command.c_str());
+        vector<string> actual {};
+        get_flags(actual, man_page);
+        return actual;
+    }
+
+    void test_modes(
+        const string command, 
+        const string man_page,
+        vector<string> expected_short, 
+        vector<string> expected_long
+    ) {
+        BOOST_TEST(expected_short.size() == expected_long.size());
+        vector<string> expected_mixed = {};
+        vector<string> expected_mixed_only = {};
+        make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
+        BOOST_TEST(expected_long.size() == expected_mixed.size());
+
+        remove_spaces(expected_short);
+        remove_spaces(expected_long);
+
+        const vector<pair<string, vector<string>>> cases = {
+            {string{"flag -s " + command}, expected_short},
+            {string{"flag -l " + command}, expected_long},
+            {string{"flag -m " + command}, expected_mixed},
+            {string{"flag -M " + command}, expected_mixed_only}
+        };
+
+        for (const auto& [com, exp] : cases) {
+            BOOST_TEST_CONTEXT("command: " << com) {
+                if (exp.size() == 0) BOOST_CHECK_THROW(get_command_flags(com, man_page), string);
+                else {
+                    auto actual = get_command_flags(com, man_page);
+                    BOOST_CHECK_EQUAL_COLLECTIONS(actual.begin(), actual.end(), exp.begin(), exp.end());
+                    if (actual.size() < exp.size()) BOOST_TEST_MESSAGE("missing at end: " << exp[actual.size()]);
+                    if (actual.size() > exp.size()) BOOST_TEST_MESSAGE("extra at end: " << actual[exp.size()]);
+                }
+            }
+        }
+    }
+
+    void test_title(const string title, const string man_page) {
+        BOOST_CHECK_EQUAL(print_title(man_page), title);
+    }
+
+    void test_command (
+        string command, 
+        const string title,
+        vector<string> expected_short, 
+        vector<string> expected_long
+    ) {
+        reset_globals_and_set_options(command);
+        auto man_page = load_man_page();
+
+        // Test -s, -l, -m and -M flags
+        test_modes(command, man_page, expected_short, expected_long);
+
+        // Test -t flag
+        test_title(title, man_page);
+    }
+};
+
 BOOST_FIXTURE_TEST_SUITE(flag_tests, Args)
+
+// Test -v flag
+BOOST_AUTO_TEST_CASE(version) {
+    BOOST_CHECK_EQUAL(print_program_version(), 0);
+}
 
 BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
     Input input("flag --color=always --enclose [] -c 3 -MSrtw ls");
@@ -97,8 +138,10 @@ BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
 }
 
 BOOST_AUTO_TEST_CASE(load_man_page_ls) {
-    Input input(in);
-    string man_page = load_man_page(input.ac, input.av);
+    string command = "flag -s --delimiter '\n' ls";
+    Input input(command.c_str());
+    set_program_options(input.ac, input.av);
+    auto man_page = load_man_page();
     BOOST_TEST(man_page.length() > 0);
 }
 
@@ -139,23 +182,9 @@ BOOST_AUTO_TEST_CASE(ls) {
         "--width=COLS", " ", " ", "--context", 
         "--zero", " ", "--help", "--version"
     };
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s ls", expected_short},
-        {"flag -l ls", expected_long},
-        {"flag -m ls", expected_mixed},
-        {"flag -M ls", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"ls"};
+    string title {"ls - list directory contents"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // id
@@ -171,23 +200,9 @@ BOOST_AUTO_TEST_CASE(id) {
         "--name", "--real", "--user", "--zero", 
         "--help", "--version"
     };
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_short.size() == expected_long.size());
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s id", expected_short},
-        {"flag -l id", expected_long},
-        {"flag -m id", expected_mixed},
-        {"flag -M id", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"id"};
+    string title {"id - print real and effective user and group IDs"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // wc
@@ -203,23 +218,9 @@ BOOST_AUTO_TEST_CASE(wc) {
         "--files0-from=F", "--max-line-length", "--words", "--total=WHEN",
         "--help", "--version"
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s wc", expected_short},
-        {"flag -l wc", expected_long},
-        {"flag -m wc", expected_mixed},
-        {"flag -M wc", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"wc"};
+    string title {"wc - word, line, and byte or character count"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // head
@@ -233,23 +234,9 @@ BOOST_AUTO_TEST_CASE(head) {
         "--bytes=[-]NUM", "--lines=[-]NUM", "--quiet", "--verbose", // -q, --quiet, --silent ???
         "--zero-terminated", "--help", "--version"
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s head", expected_short},
-        {"flag -l head", expected_long},
-        {"flag -m head", expected_mixed},
-        {"flag -M head", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"head"};
+    string title {"head - output the first part of files"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // tail
@@ -267,23 +254,9 @@ BOOST_AUTO_TEST_CASE(tail) {
         "--retry", "--sleep-interval=N", "--verbose", "--zero-terminated",
         "--help", "--version"
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s tail", expected_short},
-        {"flag -l tail", expected_long},
-        {"flag -m tail", expected_mixed},
-        {"flag -M tail", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"tail"};
+    string title {"tail - output the last part of files"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // date 
@@ -299,23 +272,9 @@ BOOST_AUTO_TEST_CASE(date) {
         "--resolution", "--rfc-email", "--rfc-3339=FMT", "--reference=FILE",
         "--set=STRING", "--utc", "--help", "--version" // -u, --utc, --universal ???
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s date", expected_short},
-        {"flag -l date", expected_long},
-        {"flag -m date", expected_mixed},
-        {"flag -M date", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"date"};
+    string title {"date - print or set the system date and time"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // od 
@@ -337,23 +296,9 @@ BOOST_AUTO_TEST_CASE(od) {
         " ", " ", " ", " ",
         " "
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s od", expected_short},
-        {"flag -l od", expected_long},
-        {"flag -m od", expected_mixed},
-        {"flag -M od", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"od"};
+    string title {"od - dump files in octal and other formats"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // test
@@ -375,23 +320,9 @@ BOOST_AUTO_TEST_CASE(test) {
         " ", " ", " ", " ",
         " ", " ", " ", " "
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s test", expected_short},
-        {"flag -l test", expected_long},
-        {"flag -m test", expected_mixed},
-        {"flag -M test", expected_mixed_only}
-    };
-    check_cases(cases);
+    string command {"test"};
+    string title {"test - check file types and compare values"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // echo
@@ -405,23 +336,9 @@ BOOST_AUTO_TEST_CASE(echo) {
         " ", " ", " ", "--help",
         "--version"
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s echo", expected_short},
-        {"flag -l echo", expected_long},
-        {"flag -m echo", expected_mixed}
-    };
-    check_cases(cases);
-    BOOST_CHECK_THROW(commands_for("flag -M echo"), std::string);
+    string command {"echo"};
+    string title {"echo - display a line of text"};
+    test_command(command, title, expected_short, expected_long);
 }
 BOOST_AUTO_TEST_SUITE_END()
 
@@ -442,23 +359,9 @@ BOOST_AUTO_TEST_CASE(bzip2) {
 															// -1 (or --fast) to -9 (or --best) ???
 															// --repetitive-fast --repetitive-best ???
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s bzip2", expected_short},
-        {"flag -l bzip2", expected_long},
-        {"flag -m bzip2", expected_mixed},
-        {"flag -M bzip2", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"bzip2"};
+    string title {"bzip2, bunzip2 - a block-sorting file compressor, v1.0.8"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // grep (3.12-modified)
@@ -492,23 +395,9 @@ BOOST_AUTO_TEST_CASE(grep) {
         " ", "--include=GLOB", "--recursive", "--dereference-recursive",
         "--line-buffered", "--binary", "--null-data"
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s grep", expected_short},
-        {"flag -l grep", expected_long},
-        {"flag -m grep", expected_mixed},
-        {"flag -M grep", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"grep"};
+    string title {"grep - print lines that match patterns"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // file (5.48)
@@ -550,7 +439,7 @@ BOOST_AUTO_TEST_CASE(file) {
         {"flag -m file", expected_mixed},
         {"flag -M file", expected_mixed_only},
     };
-    check_cases(cases);
+    // test_command(cases);
 }
 BOOST_AUTO_TEST_SUITE_END()
 
@@ -564,23 +453,9 @@ BOOST_AUTO_TEST_CASE(ifconfig) {
     vector<string> expected_long = {
         " ", " ", " "
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s ifconfig", expected_short},
-        {"flag -l ifconfig", expected_long},
-        {"flag -m ifconfig", expected_mixed},
-        {"flag -M ifconfig", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"ifconfig"};
+    string title {"ifconfig - configure a network interface"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // arp (net-tools 2.10)
@@ -594,23 +469,9 @@ BOOST_AUTO_TEST_CASE(arp) {
         "--verbose", "--numeric", "--hw-type type", " ",
         " ", "--use-device", "--device If", "--file filename",
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s arp", expected_short},
-        {"flag -l arp", expected_long},
-        {"flag -m arp", expected_mixed},
-        {"flag -M arp", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"arp"};
+    string title {"arp - manipulate the system ARP cache"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // tcpdump (4.99.7)
@@ -652,23 +513,9 @@ BOOST_AUTO_TEST_CASE(tcpdump) {
         " ", " ", " ", " ", 
         " ", "--linktype=datalinktype", " ", "--relinquish-privileges=user"
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s tcpdump", expected_short},
-        {"flag -l tcpdump", expected_long},
-        {"flag -m tcpdump", expected_mixed},
-        {"flag -M tcpdump", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"tcpdump"};
+    string title {"tcpdump - dump traffic on a network"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // ping (iputils 20250605)
@@ -698,23 +545,9 @@ BOOST_AUTO_TEST_CASE(ping) {
         " ", " ", " ", " ",
         " ", " ", " "
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s ping", expected_short},
-        {"flag -l ping", expected_long},
-        {"flag -m ping", expected_mixed},
-        {"flag -M ping", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"ping"};
+    string title {"ping - send ICMP ECHO_REQUEST to network hosts"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // traceroute (2.1.6)
@@ -742,23 +575,9 @@ BOOST_AUTO_TEST_CASE(traceroute) {
         " ", "--dccp", "--protocol=protocol", "--mtu", 
         "--back"
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s traceroute", expected_short},
-        {"flag -l traceroute", expected_long},
-        {"flag -m traceroute", expected_mixed},
-        {"flag -M traceroute", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"traceroute"};
+    string title {"traceroute - print the route packets trace to network host"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // netstat (net-tools 2.10)
@@ -778,23 +597,9 @@ BOOST_AUTO_TEST_CASE(netstat) {
         "--continuous", "--extend", "--timers", "--program",
         "--listening", "--all", " ", " "
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s netstat", expected_short},
-        {"flag -l netstat", expected_long},
-        {"flag -m netstat", expected_mixed},
-        {"flag -M netstat", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"netstat"};
+    string title {""};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // nc (1.101)
@@ -822,23 +627,9 @@ BOOST_AUTO_TEST_CASE(nc) {
         " ", " ", " ", " ",
         " ", " ", " "
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s nc", expected_short},
-        {"flag -l nc", expected_long},
-        {"flag -m nc", expected_mixed},
-        {"flag -M nc", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"nc"};
+    string title {"nc —— arbitrary TCP and UDP connections and listens"};
+    test_command(command, title, expected_short, expected_long);
 }
 BOOST_AUTO_TEST_SUITE_END()
 
@@ -864,23 +655,9 @@ BOOST_AUTO_TEST_CASE(git) {
         "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs", "--list-cmds=<group>[,<group>...]",
         "--attr-source=<tree-ish>"
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s git", expected_short},
-        {"flag -l git", expected_long},
-        {"flag -m git", expected_mixed},
-        {"flag -M git", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"git"};
+    string title {"git - the stupid content tracker"};
+    test_command(command, title, expected_short, expected_long);
 }
 
 // docker (29.9.2)
@@ -896,23 +673,9 @@ BOOST_AUTO_TEST_CASE(docker) {
         "--log-level=\"debug|info|warn|error|fatal\"", "--tls=true|false", "--tlscacert=~/.docker/ca.pem", "--tlscert=~/.docker/cert.pem", 
         "--tlskey=~/.docker/key.pem", "--tlsverify=true|false", "--version=true|false"
     };
-    BOOST_TEST(expected_short.size() == expected_long.size());
-
-    vector<string> expected_mixed = {};
-    vector<string> expected_mixed_only = {};
-    make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
-    BOOST_TEST(expected_long.size() == expected_mixed.size());
-
-    remove_spaces(expected_short);
-    remove_spaces(expected_long);
-
-    const vector<pair<const char*, vector<string>>> cases = {
-        {"flag -s docker", expected_short},
-        {"flag -l docker", expected_long},
-        {"flag -m docker", expected_mixed},
-        {"flag -M docker", expected_mixed_only},
-    };
-    check_cases(cases);
+    string command {"docker"};
+    string title {"docker - Docker image and container command line interface"};
+    test_command(command, title, expected_short, expected_long);
 }
 BOOST_AUTO_TEST_SUITE_END()
 

@@ -58,6 +58,12 @@ void print_sub_matches_debug(boost::smatch sm) {
 }
 // DEBUGGING
 
+int print_program_version() {
+    if (!version.empty()) {
+        cout << "flag " << version << endl;
+        return 0;
+    } else return 1;
+}
 
 int set_program_options(int end, char ** av) {
     po::options_description desc("Usage: flag [flags] [argument]\nFlags", kColumn_width);
@@ -75,7 +81,7 @@ int set_program_options(int end, char ** av) {
 
         ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), "Specify ENC used for 'enclosing' the flag output (prepending and appending); 0, 1 or 2 arguments are expected, e.g. -e '|' or --enclose '{}'")
 
-        ("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
+        // ("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
 
         ("help,h", po::bool_switch()->default_value(false), "Show this help message")
 
@@ -117,12 +123,8 @@ int set_program_options(int end, char ** av) {
             cout << desc << endl;
             return 1;
         }
-        // else if (vm["input"].as<vector<string>>().size() > 1) {
-            // throw std::string{"Flag: too many arguments (1 is excpected)"};
-        // }
         else if (vm["version"].as<bool>()) {
-            cout << "flag " << version << endl;
-            return 1;
+            return print_program_version();
         }
 
         if (vm["reverse"].as<bool>()) is_reverse = true;
@@ -161,7 +163,7 @@ int set_program_options(int end, char ** av) {
     return 0;
 }
 
-string load_man_page(int ac, char ** av) {
+string load_man_page() {
     auto input = boost::algorithm::join(vm["input"].as<vector<string>>(), " ");
     string command {"man " + input + " 2>/dev/null | " + "cat"};
     string man_page {};
@@ -171,8 +173,9 @@ string load_man_page(int ac, char ** av) {
     while (fgets(buf, 1024, po)) man_page.append(buf);
     pclose(po);
 
-    if (man_page.size() == 0) throw string{"Man page for command \"" + string{av[ac -1]} + "\" not found"};
-    else return man_page;
+    if (man_page.size() == 0) throw string{"Man page for command \"" + input + "\" not found"};
+
+    return man_page;
 }
 
 string set_delimiter() {
@@ -195,7 +198,7 @@ void print_flag_count() {
          << " | TT: " << flag_count[Mode::Short] + flag_count[Mode::Long] + flag_count[Mode::Mixed] << endl;
 }
 
-void print_title(string man_page) {
+string print_title(const string man_page) {
     string regx = R"(
         (?:^NAME\n\s{2,})\K
         .*
@@ -206,7 +209,8 @@ void print_title(string man_page) {
     boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
 
     auto sm = *sr_iterator;
-    cout << "NAME: " << sm[0] << endl;
+    // cout << "NAME: " << sm[0] << endl;
+    return sm[0];
 }
 
 void add_colors(string & output, int pipe_pos) {
