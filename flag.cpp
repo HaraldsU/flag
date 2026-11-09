@@ -198,6 +198,7 @@ int set_program_options(int end, char ** av) {
 }
 
 string set_man_page() {
+	setenv("MANWIDTH", "1000", 1); // Needed for not wrapping long lines
     auto input = boost::algorithm::join(VM["input"].as<vector<string>>(), " ");
     string command {"man " + input + " 2>/dev/null | " + "cat"};
     string man_page {};

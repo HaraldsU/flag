@@ -363,7 +363,8 @@ void print_flags_helper(A commands) {
 
         if (col_n > 1) {
             std::string offset(longest_flag_n + extra_padding - tmp_output.length(), ' ');
-            std::cout << output << offset << delim;
+            // std::cout << output << offset << delim;
+            std::cout << output << offset;
 
             count++;
             if (count == col_n) {

@@ -192,16 +192,20 @@ struct Args {
         vector<string> expected_long
     ) {
         reset_globals_and_set_options(command);
-        auto man_page = set_man_page();
+		try {
+			auto man_page = set_man_page();
 
-        vector<string> expected_mixed = {};
-        vector<string> expected_mixed_only = {};
-        make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
+			vector<string> expected_mixed = {};
+			vector<string> expected_mixed_only = {};
+			make_mixed_from_short_and_long(expected_short, expected_long, expected_mixed, expected_mixed_only);
 
-        for_all_modes(command, man_page, expected_short, expected_long, expected_mixed, expected_mixed_only);
+			for_all_modes(command, man_page, expected_short, expected_long, expected_mixed, expected_mixed_only);
 
-        // Test -t flag
-        test_title(title, man_page);
+			// Test -t flag
+			test_title(title, man_page);
+		} catch (const string & em) {
+			BOOST_CHECK_THROW(set_man_page(), string);
+		}
     }
 };
 
