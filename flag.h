@@ -8,384 +8,75 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
+using namespace std;
 
 enum class Mode { Short, Long, Mixed};
-inline const std::unordered_map<std::string, Mode> kMODES {
+inline const unordered_map<string, Mode> kMODES {
     {"short"      , Mode::Short},
     {"long"       , Mode::Long },
     {"mixed"      , Mode::Mixed},
     {"mixed-only" , Mode::Mixed}
 };
 
+const inline int kCOLUMN_WIDTH                  = 100;
+const inline string VERSION                     = "1.0.0";
 inline boost::program_options::variables_map VM = {};
 inline Mode MODE                                = Mode::Mixed;
 inline bool IS_MIXED_ONLY                       = false;
 inline bool IS_REVERSE                          = false;
 inline int  ENCLOSE_COUNT                       = 2;
+inline int  COLUMN_COUNT                        = 1;
 inline bool IS_WORD_COUNT                       = false;
 inline bool IS_TITLE                            = false;
 inline bool IS_SORT                             = false;
 inline bool IS_DEBUG                            = false;
-inline std::string DELIMITER                    = "\n";
-inline std::unordered_map<Mode, int> FLAG_COUNT = {};
+inline string DELIMITER                         = "\n";
+inline unordered_map<Mode, int> FLAG_COUNT      = {};
+inline boost::program_options::options_description DESC ("Usage: flag [flags] [argument]\nFlags", kCOLUMN_WIDTH);
 
-int set_program_options(int end,char ** av);
-int print_debug();
+// DEBUGGING
+int debug_print();
+
+void debug_print_sub_matches(const boost::smatch sm);
+// DEBUGGING
+
+// PRINTING
+int print_help();
+
 int print_program_version();
-int print_help(boost::program_options::options_description desc);
-std::string set_man_page();
-std::string set_delimiter();
-
-struct ilexic {
-    // Strip the dashes at the start to start comparing with alnum
-    static std::string strip_start(const std::string & s) {
-        auto it = find_if(s.begin(), s.end(), [](unsigned char c) { return isalnum(c); });
-        return std::string(it, s.end());
-    }
-
-    static std::string lower(std::string s) {
-        for (auto & c : s) c = tolower(static_cast<unsigned char>(c));
-        return s;
-    }
-
-    bool operator()(const std::string & a, const std::string & b) const {
-        std::string x = strip_start(a);
-        std::string y = strip_start(b);
-        if (IS_REVERSE == true) return make_tuple(lower(y), y, b) < make_tuple(lower(x), x, a);
-        else return make_tuple(lower(x), x, a) < make_tuple(lower(y), y, b);
-    }
-};
-
-void print_sub_matches_debug(boost::smatch sm);
-template <typename A>
-void add_flags(A & commands, std::string man_page, std::string regx) {
-    const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
-    boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
-
-    for (auto mr = sr_iterator; mr != boost::sregex_iterator(); mr++) {
-        std::string command {};
-        auto sm = *mr;
-
-        if (IS_DEBUG) print_sub_matches_debug(sm); // DEBUG
-
-        if (MODE == Mode::Short) { 
-            if (sm[4].matched) {
-                if (IS_DEBUG) std::cout << "LS" << std::endl;
-                command = sm[4];
-            }
-            else if (sm[3].matched) {
-                if (IS_DEBUG) std::cout << "SHORT OR SL" << std::endl;
-                command = sm[3];
-            }
-            else { 
-                if (IS_DEBUG) std::cout << "NO MATCH" << std::endl;
-                continue;
-            }
-            FLAG_COUNT[Mode::Short]++;
-        }
-
-        else if (MODE == Mode::Long) {
-            if (sm[3].matched) {
-                if (IS_DEBUG) std::cout << "SL" << std::endl;
-                command = sm[3];
-            }
-            else if (sm[4].matched) {
-                if (IS_DEBUG) std::cout << "LONG OR LS" << std::endl;
-                command = sm[4];
-            }
-            else {
-                if (IS_DEBUG) std::cout << "NO MATCH" << std::endl;
-                continue;
-            }
-            FLAG_COUNT[Mode::Long]++;
-        } 
-
-        else if (MODE == Mode::Mixed) {
-            if (sm[5].matched) {
-                if (IS_DEBUG) std::cout << "LS" << std::endl;
-                command = sm[7] + "," + sm[6];
-                FLAG_COUNT[Mode::Mixed]++;
-            }
-            else if (sm[2].matched) {
-                if (IS_DEBUG) std::cout << "SL" << std::endl;
-                command = sm[3] + "," + sm[4];
-                FLAG_COUNT[Mode::Mixed]++;
-            }
-            else if (!IS_MIXED_ONLY) {
-                if (sm[8].matched) {
-                    if (IS_DEBUG) std::cout << "SHORT" << std::endl;
-                    command = sm[8];
-                    FLAG_COUNT[Mode::Short]++;
-                }
-                else if (sm[10].matched) {
-                    if (IS_DEBUG) std::cout << "LONG" << std::endl;
-                    command = sm[10];
-                    FLAG_COUNT[Mode::Long]++;
-                }
-                else {
-                    if (IS_DEBUG) std::cout << "NO MATCH" << std::endl;
-                    continue;
-                }
-            }
-            else continue;
-        } else throw std::string{"Invalid flag notation (expected short, long or mixed)"};
-
-        if (IS_DEBUG) std::cout << std::endl;
-        bool found = find(commands.begin(), commands.end(), command) != commands.end();
-        if (!found) {
-            if (IS_REVERSE == false) commands.insert(commands.end(), command);
-            else commands.insert(commands.begin(), command);
-        }
-    }
-}
-
-template <typename A>
-void get_flags(A & commands, std::string man_page) {
-    std::string reg_final {};
-
-    // netstat has 3 spaces
-    std::string reg_start {R"(
-        # START
-        (?:^[ ]{3,6})\K
-    )"};
-
-    // Short form starts with - followed by \w, e.g. -a (ls)
-    // The flag name can contain a dash in the middle, e.g. -fcheck-new (gcc)
-    // (needs example ???)
-    // This is a valid flag -E ENCODING (rg)
-    // -I[FMT] (date)
-    std::string reg_short {R"(
-        # SHORT
-        (
-            (?:-[#\w]+)
-            (?:-\w+)*
-            (?:
-                [ ]?
-                (?:
-                    (?:[\w\[\]_:=<>]|
-                        [ ](?![ ]))|
-                        ,(?![ \-])|
-                        \-(?![\-])
-                )+
-            )?
-        )
-    )"};
-
-    // Long form starts with -- followed by \w, e.g. --all (ls)
-    // The flag name can contain a dash in the middle, e.g. --max-line-length (wc)
-    // This is a valid flag --follow[={name|descriptor}] (tail)
-    // This is the usual notation: --date=STRING (date)
-    // [--bytes=[-]NUM] (head) and [-L --license -V --version] (bzip2)
-    std::string reg_long {R"(
-        # LONG
-        (
-            (?:--\w+)
-            (?:-\w+)*
-            (?:\[)?
-            (?:
-                (?:=|[ ](?!\-))
-                (?:
-                    [\-\w\[\]{}|+=<>."/~]|
-                    [,:](?![ ])
-                )+
-            )?
-        )
-    )"};
-
-    std::string reg_sep {R"(
-        # SEP
-        (?:
-            \n[ ]{3,}|
-            [ |, ](?=--)|
-            [ ]-\w|
-            [^-\w\n]{2,}|
-            [ ]\(
-        )
-    )"};
-
-    std::string reg_end {R"(
-        # END
-        (?=
-           $|
-           :[ ]|
-           (?:[ ]|,[ ])-+|
-           [ ]{2,}\w|
-           ,[ ]-\w{2,}|
-           [ ]\(\w
-        )
-    )"};
-
-    // LONG-SHORT (want to capture SHORT)
-    std::string reg_sls =
-        "(?:" +
-            reg_long + reg_sep +
-        ")" +
-        reg_short // Actual capture
-    ;
-
-    // SHORT-LONG (want to capture LONG)
-    std::string reg_lsl =
-        "(?:" +
-            reg_short + reg_sep +
-        ")" +
-        reg_long // Actual capture
-    ;
-
-    // SHORT-LONG (want to capture BOTH)
-    std::string reg_sl = 
-        "(" +
-            reg_short + // Capture
-            reg_sep +
-            reg_long +  // Capture
-        ")"
-    ;
-
-    // LONG-SHORT (want to capture BOTH)
-    std::string reg_ls =
-        "(" +
-            reg_long +  // Capture
-            reg_sep +
-            reg_short + // Capture
-        ")"
-    ;
-
-    if (MODE == Mode::Short) {
-        reg_final = 
-            reg_start +
-            "(" +           // (1)
-                reg_sls +   // (2...6)
-                "|" +
-                reg_short + // (7...10...)
-            ")" +
-            reg_end
-        ;
-    } else if (MODE == Mode::Long) {
-        reg_final = 
-            reg_start +
-            "(" +           // (1)
-                reg_lsl +   // (2...6)
-                "|" +
-                reg_long +  // (6...10...)
-            ")" +
-            reg_end
-        ;
-    } else if (MODE == Mode::Mixed) {
-        reg_final = 
-            reg_start +
-            "(" +                       // (1)
-                reg_sl +                // (2...9)
-                "|" +
-                reg_ls +                // (10...17)
-                "|" +
-                "(" + reg_short + ")" + // (18...21)
-                "|" +
-                "(" + reg_long +  ")" +  // (22...25)
-            ")" +
-            reg_end
-        ;
-    } else throw std::string{"Invalid flag notation (expected short, long or mixed)"};
-
-    // std::cout << "reg_final: " << reg_final << std::endl;
-
-    try {
-        add_flags(commands, man_page, reg_final);
-        if (commands.size() == 0) throw std::string{"No flags found (try flag -m)"};
-    } catch (const std::string & e) { throw e; }
-}
-
-template <typename A>
-std::vector<std::string> get_n_longest_flags(const A commands) {
-    int n = VM["column"].as<int>();
-    std::vector<std::string> sorted(commands.begin(), commands.end());
-    sort(sorted.begin(), sorted.end(),
-        [](const std::string& a, const std::string& b) { return a.size() > b.size(); }
-    );
-
-    std::vector<std::string> res = {};
-    auto it = sorted.begin();
-    for (int i = 0; i < n && it != sorted.end(); i++) {
-        res.push_back(*it);
-        it++;
-    }
-
-    return res;
-}
 
 void print_flag_count();
-std::string print_title(const std::string man_page);
-void add_colors(std::string & output,int pipe_pos);
-void add_enclosing(std::string & output);
 
-template <typename A>
-void print_flags_helper(A commands) {
-    auto lf = get_n_longest_flags(commands);
-    int longest_flag_n = lf[0].length();
-    auto delim = DELIMITER;
+string print_title(const string man_page);
 
-    // int char_count = 0;
-    // for (auto i : lf) char_count += i.length();
-    // (kColumn_width < char_count) 
-    // ? std::cout << "Can NOT fit " << col_n << " columns" << std::endl
-    // : std::cout << "CAN fit " << col_n << " columns" << std::endl;
-    // std::cout << std::endl;
-    // delim = "";
+void print_flags_helper(const vector<string> commands);
 
-    int count = 0;
-    int extra_padding = 2 + ENCLOSE_COUNT;
-    int col_n = VM["column"].as<int>();
+void print_flags(const vector<string> commands, const string man_page);
+// PRINTING
 
-    for (auto iter = commands.begin(); iter != commands.end(); iter++) {
-        if (std::next(iter) == commands.end()) delim = "";
+// GETTING
+void get_flags(vector<string> & commands, string man_page);
 
-        std::string command = *iter;
-        std::string output  = "";
-        int pipe_pos   = 0;
-        if (ENCLOSE_COUNT != 0) add_enclosing(command);
+vector<string> get_n_longest_flags(const vector<string> commands);
+// GETTING
 
-        if (MODE == Mode::Mixed) {
-            int i = 0;
-            for (auto c : command) {
-                if (c != ',') {
-                    output.append(std::string{c});
-                    i++;
-                }
-                else {
-                    output.append("|");
-                    pipe_pos = i;
-                }
-            }
-        }
-        else output = command;
+int sort_flags(vector<string> & flags);
 
-        auto tmp_output = output;
-        auto when = VM["color"].as<std::string>();
-        if (when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
+int reverse_flags(vector<string> & flags);
 
-        if (col_n > 1) {
-            std::string offset(longest_flag_n + extra_padding - tmp_output.length(), ' ');
-            // std::cout << output << offset << delim;
-            std::cout << output << offset;
+// SETTING / ADDING
+int set_program_options(int end,char ** av);
 
-            count++;
-            if (count == col_n) {
-                std::cout << std::endl;
-                count = 0;
-            }
-        }
-        else std::cout << output << delim;
-    }
-    std::cout << std::endl;
-}
+string set_man_page();
 
-template <typename A>
-void print_flags(A commands, std::string man_page) {
-    print_flags_helper(commands);
-    if (IS_TITLE) { 
-        auto title = print_title(man_page); 
-        std::cout << "NAME: " << title << std::endl;
-    }
-    if (IS_WORD_COUNT) print_flag_count();
-}
+void add_colors(string & output,int pipe_pos);
+
+void add_enclosing(string & output);
+
+void add_flags(vector<string> & commands, string man_page, string regx);
+
+string set_delimiter();
+// SETTING / ADDING
 
 inline void reset_globals() {
     VM.clear();

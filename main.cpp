@@ -1,25 +1,23 @@
 #include "flag.h"
-#include <variant>
+
+using namespace std;
 
 int main(int ac, char ** av) {
     try {
         auto spo = set_program_options(ac, av);
 
         if (spo == 1) return 0;
-        if (IS_DEBUG) print_debug();
+        if (IS_DEBUG) debug_print();
 
-        std::string man_page = set_man_page();
-
-        std::variant<std::set<std::string, ilexic>, std::vector<std::string>> commands;
-        if (IS_SORT == true) commands = std::set<std::string, ilexic>{};
-        else commands = std::vector<std::string>{};
-        visit([&](auto & c) { get_flags(c, man_page); }, commands);
-
-        visit([&](auto & c) { print_flags(c, man_page); }, commands);
+        string man_page = set_man_page();
+        vector<string> commands {};
+        get_flags(commands, man_page);
+        print_flags(commands, man_page);
 
         return 0;
-    } catch (const std::string & e) {
-        std::cout << e << std::endl;
+    } catch (const string & em) {
+        cout << em << endl;
+
         return 1;
     }
 }

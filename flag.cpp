@@ -12,8 +12,41 @@
 using namespace std;
 namespace po = boost::program_options;
 
-const static int kColumn_width  = 100;
-const static string version     = "1.0.0";
+struct ilexic {
+    // Strip the dashes at the start to start comparing with alnum
+    string strip_start(const string & s) {
+        auto it = find_if(s.begin(), s.end(), [](unsigned char c) { return isalnum(c); });
+
+        return string(it, s.end());
+    }
+
+    string flag_name(const string & s) {
+        string x = strip_start(s);
+        return x.substr(0, x.find_first_of(",= ["));
+    }
+
+    string swap_case(string s) {
+        for (auto & c : s) {
+            unsigned char u = static_cast<unsigned char>(c);
+            c = isupper(u) ? tolower(u) : toupper(u);
+        }
+
+        return s;
+    }
+
+    string lower(string s) {
+        for (auto & c : s) c = tolower(static_cast<unsigned char>(c));
+
+        return s;
+    }
+
+    bool operator()(const string & a, const string & b) {
+        string x = flag_name(a);
+        string y = flag_name(b);
+
+        return make_tuple(lower(x), swap_case(x), a) < make_tuple(lower(y), swap_case(y), b);
+    }
+};
 
 // DEBUGGING
 string escape(const string& s) {
@@ -29,7 +62,7 @@ string escape(const string& s) {
     return out;
 }
 
-int print_debug() {
+int debug_print() {
     cout << "DEBUG:" << endl;
     auto m = int(MODE) == 0 ? "short"
         : int(MODE) == 1 ? "long"
@@ -46,13 +79,13 @@ int print_debug() {
     cout << "Title: "         << boolalpha     << IS_TITLE      << endl;
     cout << "Enclose count: " << ENCLOSE_COUNT << endl;
     cout << "Debug: "         << boolalpha     << IS_DEBUG   << endl;
-    cout << "Version: "       << version       << endl;
+    cout << "Version: "       << VERSION       << endl;
     cout << endl;
 
     return 0;
 }
 
-void print_sub_matches_debug(boost::smatch sm) {
+void debug_print_sub_matches(boost::smatch sm) {
     for (size_t i = 0; i < sm.size(); i++) {
         if (sm[i].matched) {
             cout << "s[" << i << "]: " << sm[i] << endl;
@@ -62,13 +95,14 @@ void print_sub_matches_debug(boost::smatch sm) {
 // DEBUGGING
 
 // PRINTING
-int print_help(po::options_description desc) {
-    cout << desc << endl;
+int print_help() {
+    cout << DESC << endl;
+
     return 1;
 }
 
 int print_program_version() {
-    cout << "flag " << version << endl;
+    cout << "flag " << VERSION << endl;
     return 1;
 }
 
@@ -93,15 +127,267 @@ string print_title(const string man_page) {
     auto sm = *sr_iterator;
     return sm[0];
 }
+
+void print_flags_helper(const vector<string> flags) {
+    auto lf = get_n_longest_flags(flags);
+    int longest_flag_n = lf[0].length();
+    auto delim = DELIMITER;
+
+    int count = 0;
+    int extra_padding = 2 + ENCLOSE_COUNT;
+    int col_n = COLUMN_COUNT;
+
+    for (auto iter = flags.begin(); iter != flags.end(); iter++) {
+        if (next(iter) == flags.end()) delim = "";
+
+        string command = *iter;
+        string output  = "";
+        int pipe_pos   = 0;
+        if (ENCLOSE_COUNT != 0) add_enclosing(command);
+
+        if (MODE == Mode::Mixed) {
+            int i = 0;
+            for (auto c : command) {
+                if (c != ',') {
+                    output.append(string{c});
+                    i++;
+                }
+                else {
+                    output.append("|");
+                    pipe_pos = i;
+                }
+            }
+        }
+        else output = command;
+
+        auto tmp_output = output;
+        auto when = VM["color"].as<string>();
+        if (when == "always" or (when == "auto" and isatty(STDOUT_FILENO))) add_colors(output, pipe_pos);
+
+        if (col_n > 1) {
+            string offset(longest_flag_n + extra_padding - tmp_output.length(), ' ');
+            cout << output << offset;
+
+            count++;
+            if (count == col_n) {
+                cout << endl;
+                count = 0;
+            }
+        }
+        else cout << output << delim;
+    }
+    cout << endl << endl;
+}
+
+void print_flags(vector<string> commands, string man_page) {
+    print_flags_helper(commands);
+    if (IS_TITLE) { 
+        auto title = print_title(man_page); 
+        cout << "NAME: " << title << endl;
+    }
+    if (IS_WORD_COUNT) print_flag_count();
+}
 // PRINTING
+
+// GETTING
+void get_flags(vector<string> & commands, string man_page) {
+    string reg_final {};
+
+    // netstat has 3 spaces
+    string reg_start {R"(
+        # START
+        (?:^[ ]{3,6})\K
+    )"};
+
+    // Short form starts with - followed by \w, e.g. -a (ls)
+    // The flag name can contain a dash in the middle, e.g. -fcheck-new (gcc)
+    // (needs example ???)
+    // This is a valid flag -E ENCODING (rg)
+    // -I[FMT] (date)
+    string reg_short {R"(
+        # SHORT
+        (
+            (?:-[#\w]+)
+            (?:-\w+)*
+            (?:
+                [ ]?
+                (?:
+                    (?:[\w\[\]_:=<>]|
+                        [ ](?![ ]))|
+                        ,(?![ \-])|
+                        \-(?![\-])
+                )+
+            )?
+        )
+    )"};
+
+    // Long form starts with -- followed by \w, e.g. --all (ls)
+    // The flag name can contain a dash in the middle, e.g. --max-line-length (wc)
+    // This is a valid flag --follow[={name|descriptor}] (tail)
+    // This is the usual notation: --date=STRING (date)
+    // [--bytes=[-]NUM] (head) and [-L --license -V --version] (bzip2)
+    string reg_long {R"(
+        # LONG
+        (
+            (?:--\w+)
+            (?:-\w+)*
+            (?:\[)?
+            (?:
+                (?:=|[ ](?!\-))
+                (?:
+                    [\-\w\[\]{}|+=<>."/~]|
+                    [,:](?![ ])
+                )+
+            )?
+        )
+    )"};
+
+    string reg_sep {R"(
+        # SEP
+        (?:
+            \n[ ]{3,}|
+            [ |, ](?=--)|
+            [ ]-\w|
+            [^-\w\n]{2,}|
+            [ ]\(
+        )
+    )"};
+
+    string reg_end {R"(
+        # END
+        (?=
+           $|
+           :[ ]|
+           (?:[ ]|,[ ])-+|
+           [ ]{2,}\w|
+           ,[ ]-\w{2,}|
+           [ ]\(\w
+        )
+    )"};
+
+    // LONG-SHORT (want to capture SHORT)
+    string reg_sls =
+        "(?:" +
+            reg_long + reg_sep +
+        ")" +
+        reg_short // Actual capture
+    ;
+
+    // SHORT-LONG (want to capture LONG)
+    string reg_lsl =
+        "(?:" +
+            reg_short + reg_sep +
+        ")" +
+        reg_long // Actual capture
+    ;
+
+    // SHORT-LONG (want to capture BOTH)
+    string reg_sl = 
+        "(" +
+            reg_short + // Capture
+            reg_sep +
+            reg_long +  // Capture
+        ")"
+    ;
+
+    // LONG-SHORT (want to capture BOTH)
+    string reg_ls =
+        "(" +
+            reg_long +  // Capture
+            reg_sep +
+            reg_short + // Capture
+        ")"
+    ;
+
+    if (MODE == Mode::Short) {
+        reg_final = 
+            reg_start +
+            "(" +           // (1)
+                reg_sls +   // (2...6)
+                "|" +
+                reg_short + // (7...10...)
+            ")" +
+            reg_end
+        ;
+    } else if (MODE == Mode::Long) {
+        reg_final = 
+            reg_start +
+            "(" +           // (1)
+                reg_lsl +   // (2...6)
+                "|" +
+                reg_long +  // (6...10...)
+            ")" +
+            reg_end
+        ;
+    } else if (MODE == Mode::Mixed) {
+        reg_final = 
+            reg_start +
+            "(" +                       // (1)
+                reg_sl +                // (2...9)
+                "|" +
+                reg_ls +                // (10...17)
+                "|" +
+                "(" + reg_short + ")" + // (18...21)
+                "|" +
+                "(" + reg_long +  ")" +  // (22...25)
+            ")" +
+            reg_end
+        ;
+    } else throw string{"Invalid flag notation (expected short, long or mixed)"};
+
+    // cout << "reg_final: " << reg_final << endl;
+
+    try {
+        add_flags(commands, man_page, reg_final);
+        if (commands.size() == 0) throw string{"No flags found (try flag -m)"};
+    } catch (const string & e) { throw e; }
+}
+
+vector<string> get_n_longest_flags(const vector<string> commands) {
+    int n = VM["column"].as<int>();
+    vector<string> sorted(commands.begin(), commands.end());
+    sort(sorted.begin(), sorted.end(),
+        [](const string& a, const string& b) { return a.size() > b.size(); }
+    );
+
+    vector<string> res = {};
+    auto it = sorted.begin();
+    for (int i = 0; i < n && it != sorted.end(); i++) {
+        res.push_back(*it);
+        it++;
+    }
+
+    return res;
+}
+// GETTING
+
+int sort_flags(vector<string> & flags) {
+    try {
+        sort(flags.begin(), flags.end(), ilexic());
+    } catch (const exception & e) {
+        throw e.what();
+    }
+
+    return 0;
+}
+
+int reverse_flags(vector<string> & flags) {
+    try {
+        reverse(flags.begin(), flags.end());
+    } catch (const exception & e) {
+        throw e.what();
+    }
+    
+    return 0;
+}
 
 // SETTING / ADDING
 int set_program_options(int end, char ** av) {
-    po::options_description desc("Usage: flag [flags] [argument]\nFlags", kColumn_width);
+    po::options_description DESC("Usage: flag [flags] [argument]\nFlags", kCOLUMN_WIDTH);
     po::options_description hidden("Hidden options");
     po::options_description all;
 
-    desc.add_options()
+    DESC.add_options()
         ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'")
 
         ("column,c", po::value<int>()->value_name("COL")->implicit_value(1)->default_value(1, ""), "List entries by columns; COL specifies the column count")
@@ -141,7 +427,7 @@ int set_program_options(int end, char ** av) {
             ;
         po::positional_options_description pos;
         pos.add("input", -1);
-        all.add(desc).add(hidden);
+        all.add(DESC).add(hidden);
 
         po::parsed_options parsed = po::command_line_parser(end, av)
             .options(all)
@@ -150,12 +436,8 @@ int set_program_options(int end, char ** av) {
         po::store(parsed, VM);
         po::notify(VM); 
 
-        if (VM["version"].as<bool>()) {
-            return print_program_version();
-        }
-        else if (VM["help"].as<bool>() or !VM.count("input")) {
-            return print_help(desc);
-        }
+        if (VM["version"].as<bool>()) return print_program_version();
+        else if (VM["help"].as<bool>() or !VM.count("input")) return print_help();
 
         if (VM["reverse"].as<bool>()) IS_REVERSE = true;
         if (VM["sort"].as<bool>()) IS_SORT = true;
@@ -166,6 +448,8 @@ int set_program_options(int end, char ** av) {
 
         if (VM.count("delimiter")) {
             DELIMITER = VM["delimiter"].as<string>();
+            if (DELIMITER == "\\n") DELIMITER = "\n";
+            else if (DELIMITER == "\\t") DELIMITER = "\t";
         }
 
         if (VM.count("enclose")) {
@@ -173,6 +457,10 @@ int set_program_options(int end, char ** av) {
             else if (VM["enclose"].as<string>().length() == 1) ENCLOSE_COUNT = 1;
             else if (VM["enclose"].as<string>().length() == 2) ENCLOSE_COUNT = 2;
             else throw string{"Flag '--enclose' excpects 0, 1 or 2 characters in the argument"};
+        }
+
+        if (VM.count("column")) {
+            COLUMN_COUNT = VM["column"].as<int>();
         }
 
         MODE = Mode::Mixed;
@@ -252,6 +540,99 @@ void add_enclosing(string & output) {
     auto enclose = VM["enclose"].as<string>();
     if (ENCLOSE_COUNT == 1) output = enclose[0] + output + enclose[0];
     else if (ENCLOSE_COUNT == 2) output = enclose[0] + output + enclose[1];
+}
+
+void add_flags(vector<string> & flags, string man_page, string regx) {
+    const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
+    boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
+
+    for (auto mr = sr_iterator; mr != boost::sregex_iterator(); mr++) {
+        string command {};
+        auto sm = *mr;
+
+        if (IS_DEBUG) debug_print_sub_matches(sm); // DEBUG
+
+        if (MODE == Mode::Short) { 
+            if (sm[4].matched) {
+                if (IS_DEBUG) cout << "LS" << endl;
+                command = sm[4];
+            }
+            else if (sm[3].matched) {
+                if (IS_DEBUG) cout << "SHORT OR SL" << endl;
+                command = sm[3];
+            }
+            else { 
+                if (IS_DEBUG) cout << "NO MATCH" << endl;
+                continue;
+            }
+            FLAG_COUNT[Mode::Short]++;
+        }
+
+        else if (MODE == Mode::Long) {
+            if (sm[3].matched) {
+                if (IS_DEBUG) cout << "SL" << endl;
+                command = sm[3];
+            }
+            else if (sm[4].matched) {
+                if (IS_DEBUG) cout << "LONG OR LS" << endl;
+                command = sm[4];
+            }
+            else {
+                if (IS_DEBUG) cout << "NO MATCH" << endl;
+                continue;
+            }
+            FLAG_COUNT[Mode::Long]++;
+        } 
+
+        else if (MODE == Mode::Mixed) {
+            if (sm[5].matched) {
+                if (IS_DEBUG) cout << "LS" << endl;
+                command = sm[7] + "," + sm[6];
+                FLAG_COUNT[Mode::Mixed]++;
+            }
+            else if (sm[2].matched) {
+                if (IS_DEBUG) cout << "SL" << endl;
+                command = sm[3] + "," + sm[4];
+                FLAG_COUNT[Mode::Mixed]++;
+            }
+            else if (!IS_MIXED_ONLY) {
+                if (sm[8].matched) {
+                    if (IS_DEBUG) cout << "SHORT" << endl;
+                    command = sm[8];
+                    FLAG_COUNT[Mode::Short]++;
+                }
+                else if (sm[10].matched) {
+                    if (IS_DEBUG) cout << "LONG" << endl;
+                    command = sm[10];
+                    FLAG_COUNT[Mode::Long]++;
+                }
+                else {
+                    if (IS_DEBUG) cout << "NO MATCH" << endl;
+                    continue;
+                }
+            }
+            else continue;
+        } else throw string{"Invalid flag notation (expected short, long or mixed)"};
+        if (IS_DEBUG) cout << endl;
+
+        // Remove duplicates
+        bool found = find(flags.begin(), flags.end(), command) != flags.end();
+        if (!found) flags.push_back(command);
+    }
+    if (IS_SORT) {
+        try {
+            sort_flags(flags);
+        } catch (const string & em) {
+            throw em;
+        }
+    }
+    if (IS_REVERSE) {
+        try {
+            reverse_flags(flags);
+        } catch (const string & em) {
+            throw em;
+        }
+    }
 }
 // SETTING / ADDING
 
