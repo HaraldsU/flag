@@ -636,7 +636,7 @@ BOOST_AUTO_TEST_CASE(grep) {
         "--files-with-matches", "--max-count=NUM", "--only-matching", "--quiet", // -q, --quiet, --silent ???
         "--no-messages", "--byte-offset", "--with-filename", "--no-filename",
         "--label=LABEL", "--line-number", "--initial-tab", "--null",
-        "--after-context=NUM", "--before-context=NUM", " ", "--group-separator=SEP", // -C NUM, -NUM, --context=NUM ???
+        "--after-context=NUM", "--before-context=NUM", "--context=NUM", "--group-separator=SEP",
         "--no-group-separator", "--text", "--binary-files=TYPE", "--devices=ACTION",
         "--directories=ACTION", "--exclude=GLOB", "--exclude-from=FILE", "--exclude-dir=GLOB",
         " ", "--include=GLOB", "--recursive", "--dereference-recursive",
@@ -880,7 +880,7 @@ BOOST_AUTO_TEST_CASE(nc) {
 }
 BOOST_AUTO_TEST_SUITE_END()
 
-BOOST_AUTO_TEST_SUITE(other)
+BOOST_AUTO_TEST_SUITE(git)
 // git (2.56.0)
 BOOST_AUTO_TEST_CASE(git) {
     vector<string> expected_short = {
@@ -907,6 +907,355 @@ BOOST_AUTO_TEST_CASE(git) {
     test_command(command, title, expected_short, expected_long);
 }
 
+// git add
+BOOST_AUTO_TEST_CASE(git_add) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-n", "-v", "-f", " ",
+        "-i", "-p", "-U<n>", " ",
+        "-e", "-u", "-A", " ",
+        "-N", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " "
+    };
+    vector<string> expected_long = {
+        "--dry-run", "--verbose", "--force", "--sparse",
+        "--interactive", "--patch", "--unified=<n>", "--inter-hunk-context=<n>",
+        "--edit", "--update", "--all", "--no-all",
+        "--intent-to-add", "--refresh", "--ignore-errors", "--ignore-missing",
+        "--no-warn-embedded-repo", "--renormalize", "--resolved", "--chmod=(+|-)x",
+        "--pathspec-from-file=<file>", "--pathspec-file-nul"
+    };
+    string command {"git add"};
+    string title {"git-add - Add file contents to the index"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git bisect
+BOOST_AUTO_TEST_CASE(git_bisect) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", " ", " "
+    };
+    vector<string> expected_long = {
+        "--no-checkout", "--first-parent", "--reset-when-found[=<where>]"
+    };
+    string command {"git bisect"};
+    string title {"git-bisect - Use binary search to find the commit that introduced a bug"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git branch 
+BOOST_AUTO_TEST_CASE(git_branch) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-d", "-D", " ", "-f",
+        "-m", "-M", "-c", "-C",
+        " ", " ", "-i", " ",
+        " ", " ", "-r", "-a",
+        "-l", " ", " ", " ",
+        "-v", "-q", " ", " ",
+        "-t", " ", " ", " ",
+        "-u <upstream>", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " "
+    };
+    vector<string> expected_long = {
+        "--delete", " ", "--create-reflog", "--force",
+        "--move", " ", "--copy", " ",
+        "--color[=<when>]", "--no-color", "--ignore-case", "--omit-empty",
+        "--column[=<options>]", "--sort=<key>", "--remotes", "--all", // --column[=<options>], --no-column ???
+        "--list", "--show-current", "--delete-merged <pattern>", "--dry-run",
+        "--verbose", "--quiet", "--abbrev=<n>", "--no-abbrev",
+        "--track[=(direct|inherit)]", "--no-track", "--recurse-submodules", "--set-upstream",
+        "--set-upstream-to=<upstream>", "--unset-upstream", "--edit-description", "--contains [<commit>]",
+        "--no-contains [<commit>]", "--merged [<commit>]", "--no-merged [<commit>]", "--forked <branch>",
+        "--points-at <object>", "--format <format>"
+    };
+    string command {"git branch"};
+    string title {"git-branch - List, create, or delete branches"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git checkout 
+BOOST_AUTO_TEST_CASE(git_checkout) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-q", " ", "-f", " ",
+        "-b <new-branch>", "-B <new-branch>", "-t", " ",
+        " ", "-l", "-d", " ",
+        " ", "-m", " ", "-p",
+        "-U<n>", " ", " ", " ",
+        " ", " ", " ", " "
+    };
+    vector<string> expected_long = {
+        "--quiet", "--progress", "--force", "--ours", // --ours, --theirs etc...
+        " ", " ", "--track[=(direct|inherit)]", "--no-track",
+        "--guess", " ", "--detach", "--orphan <new-branch>",
+        "--ignore-skip-worktree-bits", "--merge", "--conflict=<style>", "--patch",
+        "--unified=<n>", "--inter-hunk-context=<n>", "--ignore-other-worktrees", "--overwrite-ignore",
+        "--recurse-submodules", "--overlay", "--pathspec-from-file=<file>", "--pathspec-file-nul"
+    };
+    string command {"git checkout"};
+    string title {"git-checkout - Switch branches or restore working tree files"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git clean 
+BOOST_AUTO_TEST_CASE(git_clean) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-d", "-f", "-i", "-n",
+        "-q", "-e <pattern>", "-x", "-X"
+    };
+    vector<string> expected_long = {
+        " ", "--force", "--interactive", "--dry-run",
+        "--quiet", "--exclude=<pattern>", " ", " ",
+    };
+    string command {"git clean"};
+    string title {"git-clean - Remove untracked files from the working tree"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git commit
+BOOST_AUTO_TEST_CASE(git_commit) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-a", "-p", "-U<n>", " ",
+        "-C <commit>", "-c <commit>", " ", " ",
+        " ", " ", " ", " ",
+        " ", "-z", "-F <file>", " ",
+        " ", "-m <msg>", "-t <file>", "-s",
+        " ", "-n", " ", " ",
+        " ", "-e", " ", " ",
+        " ", "-i", "-o", " ",
+        " ", "-u[<mode>]", "-v", "-q",
+        " ", " ", " ", "-S[<key-id>]"
+    };
+    vector<string> expected_long = {
+        "--all", "--patch", "--unified=<n>", "--inter-hunk-context=<n>",
+        "--reuse-message=<commit>", "--reedit-message=<commit>", "--fixup=[(amend|reword):]<commit>", "--squash=<commit>",
+        "--reset-author", "--short", "--branch", "--porcelain",
+        "--long", "--null", "--file=<file>", "--author=<author>",
+        "--date=<date>", "--message=<msg>", "--template=<file>", "--signoff",
+        "--trailer <token>[(=|:)<value>]", "--verify", "--allow-empty", "--allow-empty-message",
+        "--cleanup=<mode>", "--edit", "--no-edit", "--amend",
+        "--no-post-rewrite", "--include", "--only", "--pathspec-from-file=<file>",
+        "--pathspec-file-nul", "--untracked-files[=<mode>]", "--verbose", "--quiet",
+        "--dry-run", "--status", "--no-status", "--gpg-sign[=<key-id>]"
+    };
+    string command {"git commit"};
+    string title {"git-commit - Record changes to the repository"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git fetch
+BOOST_AUTO_TEST_CASE(git_fetch) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", "-a", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        "-f", "-k", " ", " ",
+        " ", " ", "-p", "-P",
+        "-n", " ", " ", "-t",
+        " ", "-j <n>", " ", " ", 
+        " ", " ", "-u", " ", 
+        "-q", "-v", " ", "-o <option>", 
+        " ", " ", "-4", "-6", 
+        " "
+    };
+    vector<string> expected_long = {
+        "--all", "--append", "--atomic", "--depth=<depth>",
+        "--deepen=<depth>", "--shallow-since=<date>", "--shallow-exclude=<ref>", "--unshallow",
+        "--update-shallow", "--negotiation-restrict=(<commit>|<glob>)", "--negotiation-include=(<commit>|<glob>)", "--negotiate-only",
+        "--dry-run", "--porcelain", "--filter=<filter-spec>", "--write-fetch-head",
+        "--force", "--keep", "--multiple", "--auto-maintenance",
+        "--write-commit-graph", "--prefetch", "--prune", "--prune-tags",
+        "--no-tags", "--refetch", "--refmap=<refspec>", "--tags",
+        "--recurse-submodules[=(yes|on-demand|no)]", "--jobs=<n>", "--no-recurse-submodules", "--set-upstream",
+        "--submodule-prefix=<path>", "--recurse-submodules-default=(yes|on-demand)", "--update-head-ok", "--upload-pack <upload-pack>",
+        "--quiet", "--verbose", "--progress", "--server-option=<option>",
+        "--show-forced-updates", "--no-show-forced-updates", "--ipv4", "--ipv6",
+        "--stdin"
+    };
+    string command {"git fetch"};
+    string title {"git-fetch - Download objects and refs from another repository"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git init 
+BOOST_AUTO_TEST_CASE(git_init) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-q", " ", " ", " ",
+        " ", " ", "-b <branch-name>", " "
+    };
+    vector<string> expected_long = {
+        "--quiet", "--bare", "--object-format=<format>", "--ref-format=<format>",
+        "--template=<template-directory>", "--separate-git-dir=<git-dir>", "--initial-branch=<branch-name>", "--shared[=(false|true|umask|group|all|world|everybody|<perm>)]",
+    };
+    string command {"git init"};
+    string title {"git-init - Create an empty Git repository or reinitialize an existing one"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git merge 
+BOOST_AUTO_TEST_CASE(git_merge) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", "-e", " ", " ",
+        "-S[<key-id>]", " ", " ", "-n",
+        " ", " ", " ", "-s <strategy>",
+        "-X <option>", " ", " ", "-q",
+        "-v", " ", " ", " ",
+        "-m <msg>", " ", "-F <file>", " ",
+        " ", " ", " ", " "
+    };
+    vector<string> expected_long = {
+        "--commit", "--edit", "--cleanup=<mode>", "--ff",
+        "--gpg-sign[=<key-id>]", "--log[=<n>]", "--signoff", "--stat",
+        "--compact-summary", "--squash", "--verify", "--strategy=<strategy>",
+        "--strategy-option=<option>", "--verify-signatures", "--summary", "--quiet",
+        "--verbose", "--progress", "--autostash", "--allow-unrelated-histories",
+        " ", "--into-name <branch>", "--file=<file>", "--rerere-autoupdate",
+        "--overwrite-ignore", "--abort", "--quit", "--continue"
+    };
+    string command {"git merge"};
+    string title {"git-merge - Join two or more development histories together"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git pull
+BOOST_AUTO_TEST_CASE(git_pull) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-q", "-v", " ", " ",
+        "-e", " ", " ", " ",
+        "-S[<key-id>]", " ", " ", "-n",
+        " ", " ", " ", "-s <strategy>",
+        "-X <option>", " ", " ", " ",
+        " ", "-r", " ", " ",
+        "-a", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", "-f", "-k",
+        " ", "-p", " ", " ",
+        "-t", "-j <n>", " ", " ",
+        " ", "-o <option>", " ", " ",
+        "-4", "-6"
+    };
+    vector<string> expected_long = {
+        "--quiet", "--verbose", "--recurse-submodules[=(yes|on-demand|no)]", "--commit",
+        "--edit", "--cleanup=<mode>", "--ff-only", "--ff",
+        "--gpg-sign[=<key-id>]", "--log[=<n>]", "--signoff", "--stat",
+        "--compact-summary", "--squash", "--verify", "--strategy=<strategy>",
+        "--strategy-option=<option>", "--verify-signatures", "--summary", "--autostash",
+        "--allow-unrelated-histories", "--rebase[=(true|merges|false|interactive)]", "--no-rebase", "--all",
+        "--append", "--atomic", "--depth=<depth>", "--deepen=<depth>",
+        "--shallow-since=<date>", "--shallow-exclude=<ref>", "--unshallow", "--update-shallow",
+        "--negotiation-restrict=(<commit>|<glob>)", "--negotiation-include=(<commit>|<glob>)", "--negotiate-only", "--dry-run",
+        "--porcelain", "--filter=<filter-spec>", "--force", "--keep",
+        "--prefetch", "--prune", "--no-tags", "--refmap=<refspec>",
+        "--tags", "--jobs=<n>", "--set-upstream", "--upload-pack <upload-pack>",
+        "--progress", "--server-option=<option>", "--show-forced-updates", "--no-show-forced-updates",
+        "--ipv4", "--ipv6"
+    };
+    string command {"git pull"};
+    string title {"git-pull - Fetch from and integrate with another repository or a local branch"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git push
+BOOST_AUTO_TEST_CASE(git_push) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", " ", " ", "-n",
+        " ", "-d", " ", " ",
+        " ", " ", "-o <option>", " ",
+        " ", "-f", " ", " ",
+        "-u", " ", "-q", "-v",
+        " ", " ", " ", "-4",
+        "-6"
+    };
+    vector<string> expected_long = {
+        "--all", "--prune", "--mirror", "--dry-run",
+        "--porcelain", "--delete", "--tags", "--follow-tags",
+        "--signed", "--atomic", "--push-option=<option>", "--receive-pack=<git-receive-pack>",
+        "--force-with-lease", "--force", "--force-if-includes", "--repo=<repository>",
+        "--set-upstream", "--thin", "--quiet", "--verbose",
+        "--progress", "--no-recurse-submodules", "--verify", "--ipv4",
+        "--ipv6"
+    };
+    string command {"git push"};
+    string title {"git-push - Update remote refs along with associated objects"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git rebase 
+BOOST_AUTO_TEST_CASE(git_rebase) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", "-m", "-s <strategy>", "-X <strategy-option>",
+        " ", "-S[<keyid>]", "-q", "-v",
+        " ", "-n", " ", " ",
+        "-C<n>", "-f", " ", " ",
+        " ", " ", " ", " ",
+        " ", "-i", "-r", "-x <cmd>",
+        " ", " ", " ", " ",
+        " "
+    };
+    vector<string> expected_long = {
+        "--continue", "--skip", "--abort", "--quit",
+        "--edit-todo", "--show-current-patch", "--onto <newbase>", "--keep-base",
+        "--apply", "--empty=(drop|keep|stop)", "--no-keep-empty", "--reapply-cherry-picks",
+        "--allow-empty-message", "--merge", "--strategy=<strategy>", "--strategy-option=<strategy-option>",
+        "--rerere-autoupdate", "--gpg-sign[=<keyid>]", "--quiet", "--verbose",
+        "--stat", "--no-stat", "--no-verify", "--verify",
+        " ", "--no-ff", "--fork-point", "--ignore-whitespace",
+        "--whitespace=<option>", "--committer-date-is-author-date", "--ignore-date", "--signoff",
+        "--trailer=<trailer>", "--interactive", "--rebase-merges[=(rebase-cousins|no-rebase-cousins)]", "--exec <cmd>",
+        "--root", "--autosquash", "--autostash", "--reschedule-failed-exec",
+        "--update-refs"
+    };
+    string command {"git rebase"};
+    string title {"git-rebase - Reapply commits on top of another base tip"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// git tag
+BOOST_AUTO_TEST_CASE(git_tag) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-a", "-s", " ", "-u <key-id>",
+        "-f", "-d", "-v", "-n<num>",
+        "-l", " ", " ", "-i",
+        " ", " ", " ", " ",
+        " ", " ", " ", "-m <msg>",
+        "-F <file>", " ", "-e", " ",
+        " ", " "
+    };
+    vector<string> expected_long = {
+        "--annotate", "--sign", "--no-sign", "--local-user=<key-id>",
+        "--force", "--delete", "--verify", " ",
+        "--list", "--sort=<key>", "--color[=<when>]", "--ignore-case",
+        "--omit-empty", "--column[=<options>]", "--contains [<commit>]", "--no-contains [<commit>]",
+        "--merged [<commit>]", "--no-merged [<commit>]", "--points-at [<object>]", "--message=<msg>",
+        "--file=<file>", "--trailer <token>[(=|:)<value>]", "--edit", "--cleanup=<mode>",
+        "--create-reflog", "--format=<format>"
+    };
+    string command {"git tag"};
+    string title {"git-tag - Create, list, delete or verify tags"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(docker)
 // docker (29.9.2)
 BOOST_AUTO_TEST_CASE(docker) {
     vector<string> expected_short = {
@@ -922,6 +1271,132 @@ BOOST_AUTO_TEST_CASE(docker) {
     };
     string command {"docker"};
     string title {"docker - Docker image and container command line interface"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// docker commit
+BOOST_AUTO_TEST_CASE(docker_commit) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-a", "-c", "-m", " "
+    };
+    vector<string> expected_long = {
+        "--author=\"\"", "--change=", "--message=\"\"", "--no-pause[=false]",
+    };
+    string command {"docker commit"};
+    string title {"docker-commit - Create a new image from a container's changes"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// docker create
+BOOST_AUTO_TEST_CASE(docker_create) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", " ", "-a", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        "-c", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", "-e",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", "-h",
+        " ", "-i", " ", " ",
+        " ", " ", " ", " ",
+        "-l", " ", " ", " ",
+        " ", " ", " ", "-m",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", "-p", "-P",
+        " ", "-q", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", "-t", " ", " ",
+        " ", "-u", " ", " ",
+        "-v", " ", " ", "-w"
+    };
+    vector<string> expected_long = {
+        "--add-host=", "--annotation=map[]", "--attach=", "--blkio-weight=0",
+        "--blkio-weight-device=[]", "--cap-add=", "--cap-drop=", "--cgroup-parent=\"\"",
+        "--cgroupns=\"\"", "--cidfile=\"\"", "--cpu-count=0", "--cpu-percent=0",
+        "--cpu-period=0", "--cpu-quota=0", "--cpu-rt-period=0", "--cpu-rt-runtime=0",
+        "--cpu-shares=0", "--cpus=", "--cpuset-cpus=\"\"", "--cpuset-mems=\"\"",
+        "--device=", "--device-cgroup-rule=", "--device-read-bps=[]", "--device-read-iops=[]",
+        "--device-write-bps=[]", "--device-write-iops=[]", "--dns=", "--dns-option=",
+        "--dns-search=", "--domainname=\"\"", "--entrypoint=\"\"", "--env=",
+        "--env-file=", "--expose=", "--gpus=", "--group-add=",
+        "--health-cmd=\"\"", "--health-interval=0s", "--health-retries=0", "--health-start-interval=0s",
+        "--health-start-period=0s", "--health-timeout=0s", "--help[=false]", "--hostname=\"\"",
+        "--init[=false]", "--interactive[=false]", "--io-maxbandwidth=0", "--io-maxiops=0",
+        "--ip=", "--ip6=", "--ipc=\"\"", "--isolation=\"\"",
+        "--label=", "--label-file=", "--link=", "--link-local-ip=",
+        "--log-driver=\"\"", "--log-opt=", "--mac-address=\"\"", "--memory=0",
+        "--memory-reservation=0", "--memory-swap=0", "--memory-swappiness=-1", "--mount=",
+        "--name=\"\"", "--network=", "--network-alias=", "--no-healthcheck[=false]",
+        "--oom-kill-disable[=false]", "--oom-score-adj=0", "--pid=\"\"", "--pids-limit=0",
+        "--platform=\"\"", "--privileged[=false]", "--publish=", "--publish-all[=false]",
+        "--pull=\"missing\"", "--quiet[=false]", "--read-only[=false]", "--restart=\"no\"",
+        "--rm[=false]", "--runtime=\"\"", "--security-opt=", "--shm-size=0",
+        "--stop-signal=\"\"", "--stop-timeout=0", "--storage-opt=", "--sysctl=map[]",
+        "--tmpfs=", "--tty[=false]", "--ulimit=[]", "--umask=",
+        "--use-api-socket[=false]", "--user=\"\"", "--userns=\"\"", "--uts=\"\"",
+        "--volume=", "--volume-driver=\"\"", "--volumes-from=", "--workdir=\"\"",
+    };
+    string command {"docker create"};
+    string title {"docker-create - Create a new container"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// docker logs
+BOOST_AUTO_TEST_CASE(docker_logs) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", "-f", " ", "-n",
+        "-t", " " 
+    };
+    vector<string> expected_long = {
+        "--details[=false]", "--follow[=false]", "--since=\"\"", "--tail=\"all\"",
+        "--timestamps[=false]", "--until=\"\""
+    };
+    string command {"docker logs"};
+    string title {"docker-logs - Fetch the logs of a container"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// docker stats
+BOOST_AUTO_TEST_CASE(docker_stats) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-a", " ", " ", " "
+    };
+    vector<string> expected_long = {
+        "--all[=false]", "--format=\"\"", "--no-stream[=false]", "--no-trunc[=false]"
+    };
+    string command {"docker stats"};
+    string title {"docker-stats - Display a live stream of container(s) resource usage statistics"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// docker update
+BOOST_AUTO_TEST_CASE(docker_update) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", "-c", " ", " ",
+        " ", "-m", " ", " ",
+        " ", " "
+    };
+    vector<string> expected_long = {
+        "--blkio-weight=0", "--cpu-period=0", "--cpu-quota=0", "--cpu-rt-period=0",
+        "--cpu-rt-runtime=0", "--cpu-shares=0", "--cpus=", "--cpuset-cpus=\"\"",
+        "--cpuset-mems=\"\"", "--memory=0", "--memory-reservation=0", "--memory-swap=0",
+        "--pids-limit=0", "--restart=\"\""
+    };
+    string command {"docker update"};
+    string title {"docker-update - Update configuration of one or more containers"};
     test_command(command, title, expected_short, expected_long);
 }
 BOOST_AUTO_TEST_SUITE_END()

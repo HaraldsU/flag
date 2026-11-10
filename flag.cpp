@@ -48,7 +48,7 @@ struct ilexic {
     }
 };
 
-// DEBUGGING
+
 string escape(const string& s) {
     string out;
     for (char c : s) {
@@ -92,9 +92,8 @@ void debug_print_sub_matches(boost::smatch sm) {
         }
     }
 }
-// DEBUGGING
 
-// PRINTING
+
 void print_flag_count() {
     cout <<    "COUNT: "
          <<    "SF: " << FLAG_COUNT[Mode::Short]
@@ -175,15 +174,14 @@ void print_flags(vector<string> commands, string man_page) {
     }
     if (IS_WORD_COUNT) print_flag_count();
 }
-// PRINTING
 
-// GETTING
+
 void get_flags(vector<string> & commands, string man_page) {
+    // "When I wrote this code, only God and I knew how it worked. Now, only God knows it!"
     string reg_final {};
 
     // netstat has 3 spaces
     string reg_start {R"(
-        # START
         (?:^[ ]{3,6})\K
     )"};
 
@@ -193,20 +191,15 @@ void get_flags(vector<string> & commands, string man_page) {
     // This is a valid flag -E ENCODING (rg)
     // -I[FMT] (date)
     string reg_short {R"(
-        # SHORT
-        (
-            (?:-[#\w]+)
-            (?:-\w+)*
+        (?:-[#\w]+)
+        (?:-\w+)*
+        (?:
             (?:
-                [ ]?
-                (?:
-                    (?:[\w\[\]_:=<>]|
-                        [ ](?![ ]))|
-                        ,(?![ \-])|
-                        \-(?![\-])
-                )+
-            )?
-        )
+                (?:[\w\[\]_:=<>]|[ ](?![ ]))|
+                ,(?![ \-])|
+                \-(?![\-])
+            )+
+        )?
     )"};
 
     // Long form starts with -- followed by \w, e.g. --all (ls)
@@ -215,34 +208,30 @@ void get_flags(vector<string> & commands, string man_page) {
     // This is the usual notation: --date=STRING (date)
     // [--bytes=[-]NUM] (head) and [-L --license -V --version] (bzip2)
     string reg_long {R"(
-        # LONG
-        (
-            (?:--\w+)
-            (?:-\w+)*
-            (?:\[)?
+        (?:--\w+)
+        (?:-\w+)*
+        (?:\[)?
+        (?:
+            (?:(?:=|[ ])(?!\-))?
             (?:
-                (?:=|[ ](?!\-))
-                (?:
-                    [\-\w\[\]{}|+=<>."/~]|
-                    [,:](?![ ])
-                )+
-            )?
-        )
+                [()\-\w\[\]{}|+=<>."/~]|
+                [,:](?![ ])
+            )+
+        )?
     )"};
 
-    string reg_sep {R"(
-        # SEP
-        (?:
-            \n[ ]{3,}|
-            [ |, ](?=--)|
-            [ ]-\w|
-            [^-\w\n]{2,}|
-            [ ]\(
-        )
-    )"};
+    string reg_sep {
+        R"(
+            (?:
+                (?:[ ]|,[ ])(?=-)|
+                \n[ ]{3,}|
+        )"
+            R"(,[ ](?:)" + reg_short + R"(),[ ](?=--\w))"
+            R"(|)"
+            R"(,[ ](?:)" + reg_long + R"(),[ ](?=-\w))"
+        R"())"};
 
     string reg_end {R"(
-        # END
         (?=
            $|
            :[ ]|
@@ -258,7 +247,7 @@ void get_flags(vector<string> & commands, string man_page) {
         "(?:" +
             reg_long + reg_sep +
         ")" +
-        reg_short // Actual capture
+        "(" + reg_short + ")" // Actual capture
     ;
 
     // SHORT-LONG (want to capture LONG)
@@ -266,64 +255,61 @@ void get_flags(vector<string> & commands, string man_page) {
         "(?:" +
             reg_short + reg_sep +
         ")" +
-        reg_long // Actual capture
+        "(" + reg_long + ")" // Actual capture
     ;
 
     // SHORT-LONG (want to capture BOTH)
     string reg_sl = 
-        "(" +
-            reg_short + // Capture
+        "((" + reg_short + ")" + // Capture
             reg_sep +
-            reg_long +  // Capture
+            "(" + reg_long + ")" +  // Capture
         ")"
     ;
 
     // LONG-SHORT (want to capture BOTH)
     string reg_ls =
-        "(" +
-            reg_long +  // Capture
+        "((" + reg_long + ")" +  // Capture
             reg_sep +
-            reg_short + // Capture
+            "(" + reg_short + ")" + // Capture
         ")"
     ;
 
     if (MODE == Mode::Short) {
         reg_final = 
             reg_start +
-            "(" +           // (1)
-                reg_sls +   // (2...6)
+            "(" +
+                reg_sls +
                 "|" +
-                reg_short + // (7...10...)
+                "(" + reg_short + ")" +
             ")" +
             reg_end
         ;
     } else if (MODE == Mode::Long) {
         reg_final = 
             reg_start +
-            "(" +           // (1)
-                reg_lsl +   // (2...6)
+            "(" +
+                reg_lsl +
                 "|" +
-                reg_long +  // (6...10...)
+                "(" + reg_long + ")" +
             ")" +
             reg_end
         ;
     } else if (MODE == Mode::Mixed) {
         reg_final = 
             reg_start +
-            "(" +                       // (1)
-                reg_sl +                // (2...9)
+            "(" +
+                reg_sl +
                 "|" +
-                reg_ls +                // (10...17)
+                reg_ls +
                 "|" +
-                "(" + reg_short + ")" + // (18...21)
+                "(" + reg_short + ")" +
                 "|" +
-                "(" + reg_long +  ")" +  // (22...25)
+                "(" + reg_long +  ")" +
             ")" +
             reg_end
         ;
     } else throw string{"Invalid flag notation (expected short, long or mixed)"};
-
-    // cout << "reg_final: " << reg_final << endl;
+    // cout << reg_final << endl;
 
     try {
         add_flags(commands, man_page, reg_final);
@@ -347,7 +333,7 @@ vector<string> get_n_longest_flags(const vector<string> commands) {
 
     return res;
 }
-// GETTING
+
 
 int sort_flags(vector<string> & flags) {
     try {
@@ -369,7 +355,7 @@ int reverse_flags(vector<string> & flags) {
     return 0;
 }
 
-// SETTING / ADDING
+
 int set_program_options(int end, char ** av) {
     boost::program_options::options_description desc ("Usage: flag [flags] [argument]\nFlags", kCOLUMN_WIDTH);
     po::options_description hidden("Hidden options");
@@ -545,14 +531,18 @@ void add_flags(vector<string> & flags, string man_page, string regx) {
         if (IS_DEBUG) debug_print_sub_matches(sm); // DEBUG
 
         if (MODE == Mode::Short) { 
-            if (sm[4].matched) {
+            if (sm[2].matched) {
                 if (IS_DEBUG) cout << "LS" << endl;
-                command = sm[4];
+                command = sm[2];
             }
             else if (sm[3].matched) {
                 if (IS_DEBUG) cout << "SHORT OR SL" << endl;
                 command = sm[3];
             }
+            // else if (sm[2].matched) {
+                // if (IS_DEBUG) cout << "LLS" << endl;
+                // command = sm[2];
+            // }
             else { 
                 if (IS_DEBUG) cout << "NO MATCH" << endl;
                 continue;
@@ -561,13 +551,13 @@ void add_flags(vector<string> & flags, string man_page, string regx) {
         }
 
         else if (MODE == Mode::Long) {
-            if (sm[3].matched) {
+            if (sm[2].matched) {
                 if (IS_DEBUG) cout << "SL" << endl;
-                command = sm[3];
+                command = sm[2];
             }
-            else if (sm[4].matched) {
+            else if (sm[3].matched) {
                 if (IS_DEBUG) cout << "LONG OR LS" << endl;
-                command = sm[4];
+                command = sm[3];
             }
             else {
                 if (IS_DEBUG) cout << "NO MATCH" << endl;
@@ -577,25 +567,30 @@ void add_flags(vector<string> & flags, string man_page, string regx) {
         } 
 
         else if (MODE == Mode::Mixed) {
-            if (sm[5].matched) {
+            if (sm[2].matched) {
                 if (IS_DEBUG) cout << "LS" << endl;
-                command = sm[7] + "," + sm[6];
-                FLAG_COUNT[Mode::Mixed]++;
-            }
-            else if (sm[2].matched) {
-                if (IS_DEBUG) cout << "SL" << endl;
                 command = sm[3] + "," + sm[4];
                 FLAG_COUNT[Mode::Mixed]++;
             }
+            else if (sm[5].matched) {
+                if (IS_DEBUG) cout << "LLS" << endl;
+                command = sm[7] + "," + sm[6];
+                FLAG_COUNT[Mode::Mixed]++;
+            }
+            // else if (sm[2].matched) {
+                // if (IS_DEBUG) cout << "SL" << endl;
+                // command = sm[3] + "," + sm[6];
+                // FLAG_COUNT[Mode::Mixed]++;
+            // }
             else if (!IS_MIXED_ONLY) {
                 if (sm[8].matched) {
                     if (IS_DEBUG) cout << "SHORT" << endl;
                     command = sm[8];
                     FLAG_COUNT[Mode::Short]++;
                 }
-                else if (sm[10].matched) {
+                else if (sm[9].matched) {
                     if (IS_DEBUG) cout << "LONG" << endl;
-                    command = sm[10];
+                    command = sm[9];
                     FLAG_COUNT[Mode::Long]++;
                 }
                 else {
@@ -626,5 +621,4 @@ void add_flags(vector<string> & flags, string man_page, string regx) {
         }
     }
 }
-// SETTING / ADDING
 
