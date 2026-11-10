@@ -16,7 +16,7 @@ int main(int ac, char ** av) {
 
         return 0;
     } catch (const string & em) {
-        cout << em << endl;
+        cout << "Flag: " << em << endl;
 
         return 1;
     }

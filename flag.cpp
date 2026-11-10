@@ -308,12 +308,12 @@ void get_flags(vector<string> & commands, string man_page) {
             ")" +
             reg_end
         ;
-    } else throw string{"Invalid flag notation (expected short, long or mixed)"};
+    } else throw string{"invalid flag notation (expected short, long or mixed)"};
     // cout << reg_final << endl;
 
     try {
         add_flags(commands, man_page, reg_final);
-        if (commands.size() == 0) throw string{"No flags found (try flag -m)"};
+        if (commands.size() == 0) throw string{"no flags found (try flag -m)"};
     } catch (const string & e) { throw e; }
 }
 
@@ -436,7 +436,7 @@ int set_program_options(int end, char ** av) {
             if (VM["enclose"].as<string>().length() == 0) ENCLOSE_COUNT = 0;
             else if (VM["enclose"].as<string>().length() == 1) ENCLOSE_COUNT = 1;
             else if (VM["enclose"].as<string>().length() == 2) ENCLOSE_COUNT = 2;
-            else throw string{"Flag '--enclose' excpects 0, 1 or 2 characters in the argument"};
+            else throw string{"'--enclose' excpects 0, 1 or 2 characters in the argument"};
             ENCLOSE = VM["enclose"].as<string>();
         }
 
@@ -450,17 +450,8 @@ int set_program_options(int end, char ** av) {
             if (it != kMODES.end())
                 MODE = it->second;
         }
-    } catch (const po::invalid_command_line_syntax& e) {
-        if (e.kind() == po::invalid_command_line_syntax::empty_adjacent_parameter) {
-            string opt = e.get_option_name();
-            if (opt == "--enclose") {
-                throw string{"Empty value for " + e.get_option_name() + "=, use --enclose '' instead"};
-            } else if (opt == "--DELIMITER") {
-                throw string{"Empty value for " + e.get_option_name() + "=, use --DELIMITER '' instead"};
-            }
-        }
-
-        throw string{"Flag: unknown error occured"};
+    } catch (const po::error & e) {
+        throw string{e.what()};
     }
 
     return 0;
@@ -477,7 +468,7 @@ string set_man_page() {
     while (fgets(buf, 1024, po)) man_page.append(buf);
     pclose(po);
 
-    if (man_page.size() == 0) throw string{"Man page for command \"" + input + "\" not found"};
+    if (man_page.size() == 0) throw string{"man page for command \"" + input + "\" not found"};
 
     return man_page;
 }
@@ -599,7 +590,7 @@ void add_flags(vector<string> & flags, string man_page, string regx) {
                 }
             }
             else continue;
-        } else throw string{"Invalid flag notation (expected short, long or mixed)"};
+        } else throw string{"invalid flag notation (expected short, long or mixed)"};
         if (IS_DEBUG) cout << endl;
 
         // Remove duplicates
