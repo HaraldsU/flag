@@ -28,6 +28,19 @@ void remove_spaces(vector<string> & v) {
     v.erase(std::remove(v.begin(), v.end(), " "), v.end());
 }
 
+void reset_globals() {
+    VM.clear();
+    MODE          = Mode::Mixed;
+    IS_MIXED_ONLY = false;
+    IS_REVERSE    = false;
+    ENCLOSE_COUNT = 2;
+    IS_WORD_COUNT = false;
+    IS_TITLE      = false;
+    IS_SORT       = false;
+    IS_DEBUG      = false;
+    FLAG_COUNT.clear();
+}
+
 struct CaptureCout {
     ostringstream sink;
     streambuf* old = cout.rdbuf(sink.rdbuf());
@@ -67,6 +80,7 @@ struct Args {
         reset_globals_and_set_options(command.c_str());
         vector<string> actual {};
         get_flags(actual, man_page);
+
         return actual;
     }
 
@@ -78,32 +92,6 @@ struct Args {
         BOOST_CHECK_EQUAL_COLLECTIONS(act.begin(), act.end(), exp.begin(), exp.end());
         if (act.size() < exp.size()) BOOST_TEST_MESSAGE("missing at end: " << exp[act.size()]);
         if (act.size() > exp.size()) BOOST_TEST_MESSAGE("extra at end: " << act[exp.size()]);
-    }
-
-    // Test the -S|--sort flag
-    void test_sort(vector<string> act_fl) {
-        IS_SORT = true;
-
-        auto sort_fl = act_fl;
-        reverse_flags(sort_fl);
-
-        // Not really testing if the sort happens but I would need ground truth values to do that ...
-        BOOST_TEST(act_fl.size() == sort_fl.size());
-        BOOST_TEST(act_fl.size() != sort_fl.size() - 1);
-
-        IS_SORT = false;
-    }
-
-    // Test the --[r]everse flag
-    void test_reverse(vector<string> act_fl) {
-        IS_REVERSE = true;
-
-        auto rev_fl = act_fl;
-        reverse_flags(rev_fl);
-        BOOST_TEST(act_fl.size() == rev_fl.size());
-        BOOST_TEST(act_fl[0] == rev_fl[rev_fl.size() - 1]);
-
-        IS_REVERSE = false;
     }
 
     // Test the --[t]itle flag
@@ -144,8 +132,6 @@ struct Args {
                 auto actual = get_command_flags(command, man_page);
 
                 test_modes(exp, actual);
-                test_sort(actual);
-                test_reverse(actual);
                 test_flag_count(command, exp_s, exp_l, exp_m, exp_mo);
             }
         }
@@ -172,9 +158,8 @@ struct Args {
             {string{"flag -M " + command}, exp_mo}
         };
 
-        for (const auto& [com, exp] : cases) {
+        for (const auto& [com, exp] : cases) 
             test_flags(com, man_page, exp, exp_s, exp_l, exp_m, exp_mo);
-        }
     }
 
     void test_command (
@@ -183,16 +168,14 @@ struct Args {
         vector<string> exp_s, 
         vector<string> exp_l
     ) {
-        reset_globals_and_set_options(command);
 		try {
-			auto man_page = set_man_page();
-
+            reset_globals_and_set_options(command);
 			vector<string> expected_mixed = {};
 			vector<string> expected_mixed_only = {};
 			make_mixed_from_short_and_long(exp_s, exp_l, expected_mixed, expected_mixed_only);
 
+			auto man_page = set_man_page();
 			for_all_modes(command, man_page, exp_s, exp_l, expected_mixed, expected_mixed_only);
-
 			test_title(title, man_page);
 		} catch (const string & em) {
 			BOOST_CHECK_THROW(set_man_page(), string);
@@ -202,29 +185,58 @@ struct Args {
 
 BOOST_FIXTURE_TEST_SUITE(flag_tests, Args)
 
-// Test the --[v]ersion flag
-BOOST_AUTO_TEST_CASE(version) {
-    CaptureCout capture;
-    auto rc = print_program_version();
-    BOOST_CHECK_EQUAL(rc, 1);
+// Test the --color flag
+BOOST_AUTO_TEST_CASE(color) {
+    ENCLOSE_COUNT = 0;
+    string flag_s = "-a";
+    add_colors(flag_s, 0);
+    BOOST_TEST(flag_s == "\033[0m\033[31m-a\033[0m");
+
+    string flag_l = "--all";
+    add_colors(flag_l, 0);
+    BOOST_TEST(flag_l == "\033[0m\033[32m--all\033[0m");
+
+    string flag_m = "-a|--all";
+    add_colors(flag_m, 2);
+    BOOST_TEST(flag_m == "\033[0m\033[31m-a\033[33m|\033[32m--all\033[0m");
+
+    ENCLOSE_COUNT = 1;
+    string flag_me1 = "@-a|--all@";
+    add_colors(flag_me1, 3);
+    BOOST_TEST(flag_me1 == "\033[0m\033[33m@\033[31m-a\033[33m|\033[32m--all\033[33m@\033[0m");
+
+    ENCLOSE_COUNT = 2;
+    string flag_me2 = "[-a|--all]";
+    add_colors(flag_me2, 3);
+    BOOST_TEST(flag_me2 == "\033[0m\033[33m[\033[31m-a\033[33m|\033[32m--all\033[33m]\033[0m");
 }
 
-// Test the --[h]elp flag
-BOOST_AUTO_TEST_CASE(help) {
-    string command = "flag -h";
-    CaptureCout capture;
-    int rc = reset_globals_and_set_options(command);
-    auto out = capture.str();
-    BOOST_TEST(rc == 1);
-    BOOST_TEST(out.length() > 0);
-    BOOST_TEST(out.length() != 0);
-}
+// Test the --[c]olumn flag
+BOOST_AUTO_TEST_CASE(column) {
+    string command1 {"flag --column 1 --delimiter '" + DELIMITER + "' ls"};
+    reset_globals_and_set_options(command1);
+    auto man_page = set_man_page();
+    auto actual1 = get_command_flags(command1, man_page);
+    string out1;
+    {
+        CaptureCout capture;
+        print_flags_helper(actual1);
+        out1 = capture.str();
+    }
+    BOOST_TEST(!VM["column"].defaulted());
 
-// Test the -D|--debug flag
-BOOST_AUTO_TEST_CASE(debug) {
-    CaptureCout capture;
-    auto rc = debug_print();
-    BOOST_TEST(rc == 0);
+    string command2 {"flag --column 3 -delimiter '" + DELIMITER + "' ls"};
+    reset_globals_and_set_options(command2);
+    auto actual2 = get_command_flags(command2, man_page);
+    string out2;
+    {
+        CaptureCout capture;
+        print_flags_helper(actual2);
+        out2 = capture.str();
+    }
+    BOOST_TEST(!VM["column"].defaulted());
+
+    BOOST_TEST(out1.size() != out2.size());
 }
 
 // Test the --[d]elimiter flag
@@ -237,7 +249,7 @@ BOOST_AUTO_TEST_CASE(delimiter) {
 
     for (auto & [del, out] : cases) {
         DELIMITER = del;
-        string command {"flag -d '" + DELIMITER + "' pwd"};
+        string command {"flag --delimiter '" + DELIMITER + "' pwd"};
         reset_globals_and_set_options(command);
         auto man_page = set_man_page();
         auto actual1 = get_command_flags(command, man_page);
@@ -246,68 +258,136 @@ BOOST_AUTO_TEST_CASE(delimiter) {
             print_flags(actual1, man_page);
             out = capture.str();
         }
+        BOOST_TEST(!VM["delimiter"].defaulted());
         BOOST_TEST(out.find(del));
         vector<boost::iterator_range<string::iterator>> hits;
         boost::algorithm::find_all(hits, out, del);
-        if (del == "\n") BOOST_TEST(actual1.size() == hits.size() - 1); // This has an extra newline so the next prompt
-                                                                        // doesn't start on the same line
-        else BOOST_TEST(actual1.size() - 1 == hits.size());
+        if (del == "\n") BOOST_TEST(actual1.size() == hits.size());
+        else BOOST_TEST(actual1.size() - 1 == hits.size()); // If we have a delimiter like ',' it is removed from the last occurence
     }
 }
 
-// Test the --color flag
-BOOST_AUTO_TEST_CASE(color) {
-    string flag_s = "-a";
-    add_colors(flag_s, 0);
-    BOOST_TEST(flag_s == "\033[0m\033[31m-a\033[0m");
-
-    string flag_l = "--all";
-    add_colors(flag_l, 0);
-    BOOST_TEST(flag_l == "\033[0m\033[32m--all\033[0m");
-
-    string flag_m = "-a|--all";
-    add_colors(flag_m, 2);
-    BOOST_TEST(flag_m == "\033[0m\033[31m-a\033[33m|\033[32m--all\033[0m");
+// Test the -D|--debug flag
+BOOST_AUTO_TEST_CASE(debug) {
+    string command = "flag --debug ls";
+    int rc;
+    string out;
+    {
+        CaptureCout capture;
+        rc = reset_globals_and_set_options(command);
+        out = capture.str();
+    }
+    BOOST_TEST(!VM["debug"].defaulted());
+    BOOST_TEST(rc == 0);
 }
 
-// Test the --[c]olumn flag
-BOOST_AUTO_TEST_CASE(column) {
-    string command1 {"flag -c 1 -d '" + DELIMITER + "' ls"};
+// Test the --[e]nclose flag
+BOOST_AUTO_TEST_CASE(enclose) {
+    ENCLOSE = "";
+    ENCLOSE_COUNT = 0;
+    string flag_e0 = "-a|--all";
+    add_enclosing(flag_e0);
+    BOOST_TEST(flag_e0 == "-a|--all");
+
+    ENCLOSE = "@";
+    ENCLOSE_COUNT = 1;
+    string flag_e1 = "-a|--all";
+    add_enclosing(flag_e1);
+    BOOST_TEST(flag_e1 == "@-a|--all@");
+
+    ENCLOSE = "[]";
+    ENCLOSE_COUNT = 2;
+    string flag_e2 = "-a|--all";
+    add_enclosing(flag_e2);
+    BOOST_TEST(flag_e2 == "[-a|--all]");
+}
+
+// Test the --[h]elp flag
+BOOST_AUTO_TEST_CASE(help) {
+    string command = "flag --help";
+    int rc;
+    string out;
+    {
+        CaptureCout capture;
+        rc = reset_globals_and_set_options(command);
+        out = capture.str();
+    }
+    BOOST_TEST(!VM["help"].defaulted());
+    BOOST_TEST(rc == ExitCodes::Help);
+    BOOST_TEST(out.length() > 0);
+}
+
+// Test the --[r]everse flag
+BOOST_AUTO_TEST_CASE(reverse) {
+    string command1 = "flag wc";
     reset_globals_and_set_options(command1);
     auto man_page = set_man_page();
-    auto actual1 = get_command_flags(command1, man_page);
-    CaptureCout capture1;
-    print_flags_helper(actual1);
-    auto out1 = capture1.str();
+    auto regular = get_command_flags(command1, man_page);
 
-    string command2 {"flag -c 2 -d '" + DELIMITER + "' ls"};
+    string command2 = "flag -r wc";
     reset_globals_and_set_options(command2);
-    auto actual2 = get_command_flags(command2, man_page);
-    CaptureCout capture2;
-    print_flags_helper(actual2);
-    auto out2 = capture2.str();
+    auto reversed = get_command_flags(command2, man_page);
 
-    BOOST_TEST(out1.size() != out2.size());
+    for (size_t i = 0; i < regular.size(); i++)
+        BOOST_TEST(regular[i] == reversed[regular.size() - i - 1]);
+}
+
+// Test the -S|--sort flag
+BOOST_AUTO_TEST_CASE(sort) {
+    vector<string> sorted_exp_wc = {
+         "-c,--bytes", "--debug", "--files0-from=F", "--help", 
+         "-l,--lines", "-L,--max-line-length", "-m,--chars", "--total=WHEN", 
+         "--version", "-w,--words"
+    };
+
+    string command = "flag -S wc";
+    reset_globals_and_set_options(command);
+    auto man_page = set_man_page();
+    auto sorted_act_wc = get_command_flags(command, man_page);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(sorted_act_wc.begin(), sorted_act_wc.end(), sorted_exp_wc.begin(), sorted_exp_wc.end());
+}
+
+// Test the --[v]ersion flag
+BOOST_AUTO_TEST_CASE(version) {
+    string command = "flag --version";
+    int rc;
+    string out;
+    {
+        CaptureCout capture;
+        rc = reset_globals_and_set_options(command);
+        out = capture.str();
+    }
+    BOOST_TEST(VM.count("version"));
+    BOOST_TEST(rc == ExitCodes::Version);
+    BOOST_TEST(out == "flag " + VERSION + "\n");
 }
 
 BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
-    Input input("flag --color=always --enclose [] -c 3 -MSrtw ls");
-    BOOST_TEST(input.ac == 8);
+    Input input("flag --color=always --enclose [] --column 3 --mixed-only --sort --reverse --title --word-count ls");
+    BOOST_TEST(input.ac == 12);
     BOOST_TEST(string(input.av[0]) == "flag");
     BOOST_TEST(string(input.av[1]) == "--color=always");
     BOOST_TEST(string(input.av[2]) == "--enclose");
     BOOST_TEST(string(input.av[3]) == "[]");
-    BOOST_TEST(string(input.av[4]) == "-c");
+    BOOST_TEST(string(input.av[4]) == "--column");
     BOOST_TEST(string(input.av[5]) == "3");
-    BOOST_TEST(string(input.av[6]) == "-MSrtw");
-    BOOST_TEST(string(input.av[7]) == "ls");
+    BOOST_TEST(string(input.av[6]) == "--mixed-only");
+    BOOST_TEST(string(input.av[7]) == "--sort");
+    BOOST_TEST(string(input.av[8]) == "--reverse");
+    BOOST_TEST(string(input.av[9]) == "--title");
+    BOOST_TEST(string(input.av[10]) == "--word-count");
+    BOOST_TEST(string(input.av[11]) == "ls");
     BOOST_TEST(input.av[input.ac] == nullptr);
 }
 
 BOOST_AUTO_TEST_CASE(set_man_page_ls) {
-    string command = "flag -s --delimiter '\n' ls";
+    string command = "flag --short --delimiter '\n' ls";
     Input input(command.c_str());
-    set_program_options(input.ac, input.av);
+    {
+        CaptureCout capture;
+        set_program_options(input.ac, input.av);
+    }
     auto man_page = set_man_page();
     BOOST_TEST(man_page.length() > 0);
 }

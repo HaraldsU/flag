@@ -95,17 +95,6 @@ void debug_print_sub_matches(boost::smatch sm) {
 // DEBUGGING
 
 // PRINTING
-int print_help() {
-    cout << DESC << endl;
-
-    return 1;
-}
-
-int print_program_version() {
-    cout << "flag " << VERSION << endl;
-    return 1;
-}
-
 void print_flag_count() {
     cout <<    "COUNT: "
          <<    "SF: " << FLAG_COUNT[Mode::Short]
@@ -138,7 +127,7 @@ void print_flags_helper(const vector<string> flags) {
     int col_n = COLUMN_COUNT;
 
     for (auto iter = flags.begin(); iter != flags.end(); iter++) {
-        if (next(iter) == flags.end()) delim = "";
+        if (next(iter) == flags.end()) delim = "\n";
 
         string command = *iter;
         string output  = "";
@@ -169,14 +158,13 @@ void print_flags_helper(const vector<string> flags) {
             cout << output << offset;
 
             count++;
-            if (count == col_n) {
+            if (count == col_n or next(iter) == flags.end()) {
                 cout << endl;
                 count = 0;
             }
         }
         else cout << output << delim;
     }
-    cout << endl << endl;
 }
 
 void print_flags(vector<string> commands, string man_page) {
@@ -383,11 +371,11 @@ int reverse_flags(vector<string> & flags) {
 
 // SETTING / ADDING
 int set_program_options(int end, char ** av) {
-    po::options_description DESC("Usage: flag [flags] [argument]\nFlags", kCOLUMN_WIDTH);
+    boost::program_options::options_description desc ("Usage: flag [flags] [argument]\nFlags", kCOLUMN_WIDTH);
     po::options_description hidden("Hidden options");
     po::options_description all;
 
-    DESC.add_options()
+    desc.add_options()
         ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'")
 
         ("column,c", po::value<int>()->value_name("COL")->implicit_value(1)->default_value(1, ""), "List entries by columns; COL specifies the column count")
@@ -427,7 +415,7 @@ int set_program_options(int end, char ** av) {
             ;
         po::positional_options_description pos;
         pos.add("input", -1);
-        all.add(DESC).add(hidden);
+        all.add(desc).add(hidden);
 
         po::parsed_options parsed = po::command_line_parser(end, av)
             .options(all)
@@ -436,15 +424,21 @@ int set_program_options(int end, char ** av) {
         po::store(parsed, VM);
         po::notify(VM); 
 
-        if (VM["version"].as<bool>()) return print_program_version();
-        else if (VM["help"].as<bool>() or !VM.count("input")) return print_help();
+        if (VM["version"].as<bool>() == true) {
+            cout << "flag " << VERSION << endl;
+            return ExitCodes::Version;
+        }
+        else if (VM["help"].as<bool>() == true or !VM.count("input")) {
+            cout << desc << endl;
+            return ExitCodes::Help;
+        }
 
-        if (VM["reverse"].as<bool>()) IS_REVERSE = true;
-        if (VM["sort"].as<bool>()) IS_SORT = true;
-        if (VM["word-count"].as<bool>()) IS_WORD_COUNT = true;
-        if (VM["mixed-only"].as<bool>()) IS_MIXED_ONLY = true;
-        if (VM["title"].as<bool>()) IS_TITLE = true;
-        if (VM["debug"].as<bool>()) IS_DEBUG = true;
+        if (!VM["reverse"].defaulted()) IS_REVERSE = true;
+        if (!VM["sort"].defaulted()) IS_SORT = true;
+        if (!VM["word-count"].defaulted()) IS_WORD_COUNT = true;
+        if (!VM["mixed-only"].defaulted()) IS_MIXED_ONLY = true;
+        if (!VM["title"].defaulted()) IS_TITLE = true;
+        if (!VM["debug"].defaulted()) IS_DEBUG = true;
 
         if (VM.count("delimiter")) {
             DELIMITER = VM["delimiter"].as<string>();
@@ -457,6 +451,7 @@ int set_program_options(int end, char ** av) {
             else if (VM["enclose"].as<string>().length() == 1) ENCLOSE_COUNT = 1;
             else if (VM["enclose"].as<string>().length() == 2) ENCLOSE_COUNT = 2;
             else throw string{"Flag '--enclose' excpects 0, 1 or 2 characters in the argument"};
+            ENCLOSE = VM["enclose"].as<string>();
         }
 
         if (VM.count("column")) {
@@ -504,11 +499,9 @@ string set_man_page() {
 void add_colors(string & output, int pipe_pos) {
     // 31: red; 32: green; 33: yellow
     bool is_solo_long = false;
-    if (ENCLOSE_COUNT == 0) {
-        (output[1] == '-') ? is_solo_long = true : is_solo_long = false;
-    } else {
-        (output[2] == '-') ? is_solo_long = true : is_solo_long = false;
-    }
+    if (ENCLOSE_COUNT == 0) (output[1] == '-') ? is_solo_long = true : is_solo_long = false;
+    else (output[2] == '-') ? is_solo_long = true : is_solo_long = false;
+
 
     auto s = "\033[31m";
     auto l = "\033[32m";
@@ -537,9 +530,8 @@ void add_colors(string & output, int pipe_pos) {
 }
 
 void add_enclosing(string & output) {
-    auto enclose = VM["enclose"].as<string>();
-    if (ENCLOSE_COUNT == 1) output = enclose[0] + output + enclose[0];
-    else if (ENCLOSE_COUNT == 2) output = enclose[0] + output + enclose[1];
+    if (ENCLOSE_COUNT == 1) output = ENCLOSE[0] + output + ENCLOSE[0];
+    else if (ENCLOSE_COUNT == 2) output = ENCLOSE[0] + output + ENCLOSE[1];
 }
 
 void add_flags(vector<string> & flags, string man_page, string regx) {

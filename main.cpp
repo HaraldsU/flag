@@ -1,12 +1,12 @@
 #include "flag.h"
+#include <iostream>
 
 using namespace std;
 
 int main(int ac, char ** av) {
     try {
         auto spo = set_program_options(ac, av);
-
-        if (spo == 1) return 0;
+        if (spo == ExitCodes::Help or spo == ExitCodes::Version) return 0;
         if (IS_DEBUG) debug_print();
 
         string man_page = set_man_page();

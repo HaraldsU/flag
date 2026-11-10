@@ -1,8 +1,6 @@
 #pragma once
-#include <tuple>
 #include <string>
 #include <unistd.h>
-#include <iostream>
 #include <boost/regex.hpp>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string/join.hpp>
@@ -10,7 +8,21 @@
 
 using namespace std;
 
-enum class Mode { Short, Long, Mixed};
+namespace ExitCodes {
+    enum : int {
+        Success = 0,
+        Error = 1,
+        Help = 2,
+        Version = 3
+    };
+}
+
+enum class Mode {
+    Short, 
+    Long, 
+    Mixed
+};
+
 inline const unordered_map<string, Mode> kMODES {
     {"short"      , Mode::Short},
     {"long"       , Mode::Long },
@@ -24,15 +36,15 @@ inline boost::program_options::variables_map VM = {};
 inline Mode MODE                                = Mode::Mixed;
 inline bool IS_MIXED_ONLY                       = false;
 inline bool IS_REVERSE                          = false;
-inline int  ENCLOSE_COUNT                       = 2;
+inline int  ENCLOSE_COUNT                       = 0;
 inline int  COLUMN_COUNT                        = 1;
 inline bool IS_WORD_COUNT                       = false;
 inline bool IS_TITLE                            = false;
 inline bool IS_SORT                             = false;
 inline bool IS_DEBUG                            = false;
 inline string DELIMITER                         = "\n";
+inline string ENCLOSE                           = "";
 inline unordered_map<Mode, int> FLAG_COUNT      = {};
-inline boost::program_options::options_description DESC ("Usage: flag [flags] [argument]\nFlags", kCOLUMN_WIDTH);
 
 // DEBUGGING
 int debug_print();
@@ -77,17 +89,4 @@ void add_flags(vector<string> & commands, string man_page, string regx);
 
 string set_delimiter();
 // SETTING / ADDING
-
-inline void reset_globals() {
-    VM.clear();
-    MODE          = Mode::Mixed;
-    IS_MIXED_ONLY = false;
-    IS_REVERSE    = false;
-    ENCLOSE_COUNT = 2;
-    IS_WORD_COUNT = false;
-    IS_TITLE      = false;
-    IS_SORT       = false;
-    IS_DEBUG      = false;
-    FLAG_COUNT.clear();
-}
 
