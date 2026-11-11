@@ -9,7 +9,7 @@ int main(int ac, char ** av) {
         if (spo == ExitCodes::Help or spo == ExitCodes::Version) return 0;
         if (IS_DEBUG) debug_print();
 
-        string man_page = set_man_page();
+        auto man_page = set_man_page();
         vector<string> commands {};
         get_flags(commands, man_page);
         print_flags(commands, man_page);

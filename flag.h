@@ -30,9 +30,12 @@ inline const unordered_map<string, Mode> kMODES {
     {"mixed-only" , Mode::Mixed}
 };
 
+inline unordered_map<Mode, int> FLAG_COUNT      = {};
+inline boost::program_options::variables_map VM = {};
+
 const inline int kCOLUMN_WIDTH                  = 100;
 const inline string VERSION                     = "1.0.0";
-inline boost::program_options::variables_map VM = {};
+
 inline Mode MODE                                = Mode::Mixed;
 inline bool IS_MIXED_ONLY                       = false;
 inline bool IS_REVERSE                          = false;
@@ -44,49 +47,17 @@ inline bool IS_SORT                             = false;
 inline bool IS_DEBUG                            = false;
 inline string DELIMITER                         = "\n";
 inline string ENCLOSE                           = "";
-inline unordered_map<Mode, int> FLAG_COUNT      = {};
 
-// DEBUGGING
 int debug_print();
-
-void debug_print_sub_matches(const boost::smatch sm);
-// DEBUGGING
-
-// PRINTING
-int print_help();
-
-int print_program_version();
-
-void print_flag_count();
-
 string print_title(const string man_page);
+void print_flags_helper(const vector<string> flags);
+void print_flags(const vector<string> flags, const string man_page);
 
-void print_flags_helper(const vector<string> commands);
+void get_flags(vector<string> & flags, const string man_page);
 
-void print_flags(const vector<string> commands, const string man_page);
-// PRINTING
-
-// GETTING
-void get_flags(vector<string> & commands, string man_page);
-
-vector<string> get_n_longest_flags(const vector<string> commands);
-// GETTING
-
-int sort_flags(vector<string> & flags);
-
-int reverse_flags(vector<string> & flags);
-
-// SETTING / ADDING
 int set_program_options(int end,char ** av);
-
 string set_man_page();
 
-void add_colors(string & output,int pipe_pos);
-
+void add_colors(string & output, int pipe_pos);
 void add_enclosing(string & output);
-
-void add_flags(vector<string> & commands, string man_page, string regx);
-
-string set_delimiter();
-// SETTING / ADDING
 

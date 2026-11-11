@@ -1401,4 +1401,306 @@ BOOST_AUTO_TEST_CASE(docker_update) {
 }
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(other)
+// ssh (OpenSSH_10.6p1)
+BOOST_AUTO_TEST_CASE(ssh) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-4", "-6", "-A", "-a",
+        "-B bind_interface", "-b bind_address", "-C", "-c cipher_spec",
+        "-D [bind_address:]port", "-E log_file", "-e escape_char", "-F configfile",
+        "-f", "-G", "-g", "-I pkcs11",
+        "-i identity_file", "-J destination", "-K", "-k",
+        "-L [bind_address:]port:host:hostport", "-L [bind_address:]port:remote_socket", "-L local_socket:host:hostport", "-L local_socket:remote_socket",
+        "-l login_name", "-M", "-m mac_spec", "-N",
+        "-n", "-O ctl_cmd", "-o option", "-P tag",
+        "-p port", "-Q query_option", "-q", "-R [bind_address:]port:host:hostport",
+        "-R [bind_address:]port:local_socket", "-R remote_socket:host:hostport", "-R remote_socket:local_socket", "-R [bind_address:]port",
+        "-S ctl_path", "-s", "-T", "-t",
+        "-V", "-v", "-W host:port", "-w local_tun[:remote_tun]",
+        "-X", "-x", "-Y", "-y",
+        "-Z"
+    };
+    vector<string> expected_long = {
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " "
+    };
+    string command {"ssh"};
+    string title {"ssh —— OpenSSH remote login client"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// scp (OpenSSL 3.6.5)
+BOOST_AUTO_TEST_CASE(scp) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-3", "-4", "-6", "-A",
+        "-B", "-C", "-c cipher", "-D sftp_server_path",
+        "-F ssh_config", "-i identity_file", "-J destination", "-l limit",
+        "-O", "-o ssh_option", "-P port", "-p",
+        "-q", "-R", "-r", "-S program",
+        "-T", "-v", "-X sftp_option" 
+    };
+    vector<string> expected_long = {
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " "
+    };
+    string command {"scp"};
+    string title {"scp —— OpenSSH secure file copy"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// vim (9.2)
+BOOST_AUTO_TEST_CASE(vim) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-t {tag}", "-q [errorfile]", "-c {command}", "-A",
+        "-b", "-C", "-d", "-d {device}",
+        "-D", "-e", "-display {display}", "-E",
+        "-f", "-F", "-g", "-H",
+        "-i {viminfo}", "-l", "-L", "-m",
+        "-M", "-n", "-N", "-nb",
+        "-o[N]", "-O[N]", "-p[N]", "-P {parent-title}",
+        "-r", "-r {file}", "-R", "-s",
+        "-s {scriptin}", "-S {file}", "-T {terminal}", "-u {vimrc}",
+        "-U {gvimrc}", "-v", "-V[N]", "-V[N]{filename}",
+        "-w{number}", "-w {scriptout}", "-W {scriptout}", "-x",
+        "-X", "-Y", "-y", "-Z",
+        " ", " ", " ", " ",
+        "-h", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " " 
+    };
+    vector<string> expected_long = {
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        "--clean", "--cmd {command}", "--echo-wid", "--gui-dialog-file {name}",
+        "--help", "--literal", "--log {filename}", "--nofork",
+        "--noplugin", "--not-a-term", "--prg-name {name}", "--remote",
+        "--remote-expr {expr}", "--remote-send {keys}", "--remote-silent", "--remote-tab",
+        "--remote-tab-silent", "--remote-tab-wait", "--remote-tab-wait-silent", "--remote-wait",
+        "--remote-wait-silent", "--serverlist", "--servername {name}", "--clientserver {backend}",
+        "--socketid {id}", "--startuptime {file}", "--stdio-channel", "--ttyfail", 
+        "--version", "--windowid {id}"
+    };
+    string command {"vim"};
+    string title {"vim - Vi IMproved, a programmer's text editor"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// nvim (v0.12.6)
+BOOST_AUTO_TEST_CASE(nvim) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-t tag", "-q [errorfile]", "-e", "-E",
+        "-es", "-Es", "-d", "-R",
+        "-m", "-M", "-b", "-A",
+        "-H", "-V[N][file]", "-D", "-n",
+        "-r [file]", "-L [file]", "-u vimrc", "-i shada",
+        " ", " ", "-o[N]", "-O[N]",
+        "-p[N]", "-c command", " ", "-l script [args]",
+        "-S [session]", "-s scriptin", "-w scriptout", "-W scriptout",
+        " ", " ", " ", " ",
+        " ", "-h", "-v" 
+    };
+    vector<string> expected_long = {
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        "--noplugin", "--clean", " ", " ",
+        " ", " ", "--cmd command", " ",
+        " ", " ", " ", " ",
+        "--startuptime file", "--api-info", "--embed", "--headless",
+        "--listen address", "--help", "--version"
+    };
+    string command {"nvim"};
+    string title {"nvim —— edit text"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// kitty (0.49.2)
+BOOST_AUTO_TEST_CASE(kitty) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        " ", " ", "-T <TITLE>", "-c <CONFIG>",
+        "-o <OVERRIDE>", "-d <DIRECTORY>", " ", " ",
+        " ", " ", "-1 [=no]", " ",
+        " ", " ", " ", " ",
+        " ", "-v [=no]", " ", " ",
+        " ", " ", " ", " ",
+        " " 
+    };
+    vector<string> expected_long = {
+        "--app-id <CLS>", "--name <NAME>", "--title <TITLE>", "--config <CONFIG>",
+        "--override <OVERRIDE>", "--directory <DIRECTORY>", "--detach [=no]", "--detached-log <DETACHED_LOG>",
+        "--session <SESSION>", "--hold [=no]", "--single-instance [=no]", "--instance-group <INSTANCE_GROUP>",
+        "--wait-for-single-instance-window-close [=no]", "--listen-on <LISTEN_ON>", "--start-as <START_AS>", "--position <POSITION>",
+        "--grab-keyboard [=no]", "--version [=no]", "--dump-commands [=no]", "--replay-commands <REPLAY_COMMANDS>",
+        "--dump-bytes <DUMP_BYTES>", "--debug-gl [=no]", "--debug-input [=no]", "--debug-font-fallback [=no]",
+        "--watcher <WATCHER>"
+    };
+    string command {"kitty"};
+    string title {"kitty - The fast, feature rich terminal emulator"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// tmux (3.8)
+BOOST_AUTO_TEST_CASE(tmux) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-2", "-C", "-c shell-command", "-D",
+        "-f file", "-h", "-L socket-name", "-l",
+        "-N", "-S socket-path", "-T features", "-u",
+        "-V", "-v" 
+    };
+    vector<string> expected_long = {
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " "
+    };
+    string command {"tmux"};
+    string title {"tmux —— terminal multiplexer"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// jq (1.8.2)
+BOOST_AUTO_TEST_CASE(jq) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-n", "-R", "-s", "-c",
+        "-r", " ", "-j", "-a",
+        "-S", "-C", " ", " ", // --color-output / -C and --monochrome-output / -M: ???
+        " ", " ", " ", " ",
+        "-f", "-L directory", " ", " ",
+        " ", " ", " ", " ",
+        "-e", "-b", "-V", " ",
+        "-h", " "
+    };
+    vector<string> expected_long = {
+        "--null-input", "--raw-input", "--slurp", "--compact-output",
+        "--raw-output", "--raw-output0", "--join-output", "--ascii-output",
+        "--sort-keys", "--color-output", "--tab", "--indent n",
+        "--unbuffered", "--stream", "--stream-errors", "--seq",
+        "--from-file", "--library-path directory", "--arg name value", "--argjson name JSON-text",
+        "--slurpfile variable-name filename", "--rawfile variable-name filename", "--args", "--jsonargs",
+        "--exit-status", "--binary", "--version", "--build-configuration",
+        "--help", "--run-tests [filename]"
+    };
+    string command {"jq"};
+    string title {"jq - Command-line JSON processor"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// sed (4.10)
+BOOST_AUTO_TEST_CASE(sed) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-n", " ", "-e script", "-f script-file",
+        " ", "-i[SUFFIX]", "-l N", " ",
+        "-E", "-s", " ", "-u",
+        "-z", " ", " " 
+    };
+    vector<string> expected_long = {
+        "--quiet", "--debug", "--expression=script", "--file=script-file",
+        "--follow-symlinks", "--in-place[=SUFFIX]", "--line-length=N", "--posix",
+        "--regexp-extended", "--separate", "--sandbox", "--unbuffered",
+        "--null-data", "--help", "--version"
+    };
+    string command {"sed"};
+    string title {"sed - stream editor for filtering and transforming text"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// zip (v3.0)
+BOOST_AUTO_TEST_CASE(zip) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-a", "-A", "-AC", "-AS",
+        "-B", "-Bn", "-b path", "-c",
+        "-C", "-C2", "-C5", "-d",
+        "-db", "-dc", "-dd", "-df",
+        "-dg", "-ds size", "-du", "-dv",
+        "-D", "-DF", "-e", "-E",
+        "-f", "-F", "-FF", "-FI",
+        "-FS", "-g", "-h", "-h2", // -? ???
+        "-i files", "-I", "-ic", "-j",
+        "-jj", "-J", "-k", "-l",
+        "-la", "-lf logfilepath", "-li", "-ll",
+        "-L", "-m", "-MM", "-n suffixes",
+        "-nw", "-N", "-o", "-O output-file",
+        "-p", "-P password", "-q", "-Qn",
+        "-r", "-R", "-RE", "-s splitsize",
+        "-sb", "-sc", "-sf", "-so",
+        "-sp", "-su", "-sU", "-sv",
+        "-S", "-t mmddyyyy", "-tt mmddyyyy", "-T",
+        "-TT cmd", "-u", "-U", "-UN v",
+        "-v", "-V", "-VV", "-w",
+        "-ww", "-ws", "-x files", "-X",
+        "-y", "-z", "-Z cm", "-#",
+        "-!", "-@", "-$"
+    };
+    vector<string> expected_long = {
+        "--ascii", "--adjust-sfx", "--archive-clear", "--archive-set",
+        "--binary", " ", "--temp-path path", "--entry-comments",
+        "--preserve-case", "--preserve-case-2", "--preserve-case-5", "--delete",
+        "--display-bytes", "--display-counts", "--display-dots", "--datafork",
+        "--display-globaldots", "--dot-size size", "--display-usize", "--display-volume",
+        "--no-dir-entries", "--difference-archive", "--encrypt", "--longnames",
+        "--freshen", "--fix", "--fixfix", "--fifo",
+        "--filesync", "--grow", "--help", "--more-help",
+        "--include files", "--no-image", "--ignore-case", "--junk-paths",
+        "--absolute-path", "--junk-sfx", "--DOS-names", "--to-crlf",
+        "--log-append", "--logfile-path logfilepath", "--log-info", "--from-crlf",
+        "--license", "--move", "--must-match", "--suffixes suffixes",
+        "--no-wild", "--notes", "--latest-time", "--output-file output-file",
+        "--paths", "--password password", "--quiet", "--Q-flag n",
+        "--recurse-paths", "--recurse-patterns", "--regex", "--split-size splitsize",
+        "--split-bell", "--show-command", "--show-files", "--show-options",
+        "--split-pause", "--show-unicode", "--show-just-unicode", "--split-verbose",
+        "--system-hidden", "--from-date mmddyyyy", "--before-date mmddyyyy", "--test",
+        "--unzip-command cmd", "--update", "--copy-entries", "--unicode v",
+        "--verbose", "--VMS-portable", "--VMS-specific", "--VMS-versions",
+        "--VMS-dot-versions", "--wild-stop-dirs", "--exclude files", "--no-extra",
+        "--symlinks", "--archive-comment", "--compression-method cm", " ",
+        "--use-privileges", "--names-stdin", "--volume-label"
+    };
+    string command {"zip"};
+    string title {"zip - package and compress (archive) files"};
+    test_command(command, title, expected_short, expected_long);
+}
+BOOST_AUTO_TEST_SUITE_END()
+
 BOOST_AUTO_TEST_SUITE_END()
