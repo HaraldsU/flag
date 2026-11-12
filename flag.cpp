@@ -620,7 +620,7 @@ int set_program_options(int end, char ** av) {
 
         ("no-argument,n", po::bool_switch()->default_value(false), "Don't include the flag arguments")
 
-        ("pretty", po::bool_switch()->default_value(false), "Alias for '-Mn -c 2 -e [] --color=auto'")
+        ("pretty,p", po::bool_switch()->default_value(false), "Alias for '-Mn -c 2 -e [] --color=auto'")
 
         ("reverse,r", po::bool_switch()->default_value(false), "Reverse the order of the output")
 
