@@ -40,14 +40,20 @@ const inline string VERSION                     = "1.0.0";
 
 inline Mode MODE                                = Mode::Mixed;
 inline bool IS_MIXED_ONLY                       = false;
-inline bool IS_REVERSE                          = false;
-inline int  ENCLOSE_COUNT                       = 0;
+
 inline int  COLUMN_COUNT                        = 1;
+inline bool IS_NO_ARGUMENT                      = false;
+inline bool IS_PRETTY                           = false;
+inline bool IS_DEBUG                            = false;
+
+inline bool IS_REVERSE                          = false;
+inline bool IS_SORT                             = false;
+
 inline bool IS_FLAG_COUNT                       = false;
 inline bool IS_TITLE                            = false;
-inline bool IS_SORT                             = false;
-inline bool IS_DEBUG                            = false;
+
 inline string DELIMITER                         = "\n";
+inline int  ENCLOSE_COUNT                       = 0;
 inline string ENCLOSE                           = "";
 
 int debug_print();

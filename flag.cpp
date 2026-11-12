@@ -241,34 +241,47 @@ int add_flags_mixed(vector<string> & flags, boost::smatch sm) {
 
     if (sm[2].matched) {
         if (IS_DEBUG) cout << "SL" << endl;
-        command = sm[3] + "," + sm[6];
         captured_flags.push_back(sm[3]);
-        captured_flags.push_back(sm[6]);
+        captured_flags.push_back(sm[10]);
         FLAG_COUNT[Mode::Mixed]++;
         mode = Mode::Mixed;
+
+        if (!IS_NO_ARGUMENT) command = sm[3] + "," + sm[10];
+        else command = sm[4] + "," + sm[11];
     }
-    else if (sm[9].matched) {
+    else if (sm[13].matched) {
         if (IS_DEBUG) cout << "LS" << endl;
-        command = sm[15] + "," + sm[10];
-        captured_flags.push_back(sm[11]);
-        captured_flags.push_back(sm[15]);
+        captured_flags.push_back(sm[14]);
+        captured_flags.push_back(sm[21]);
         FLAG_COUNT[Mode::Mixed]++;
         mode = Mode::Mixed;
+
+        if (!IS_NO_ARGUMENT) command = sm[21] + "," + sm[14];
+        else command = sm[22] + "," + sm[15];
     }
     else if (!IS_MIXED_ONLY) {
-        if (sm[16].matched) {
+        if (sm[24].matched) {
             if (IS_DEBUG) cout << "SHORT" << endl;
-            command = sm[16];
-            captured_flags.push_back(sm[16]);
             FLAG_COUNT[Mode::Short]++;
             mode = Mode::Short;
+
+            if (!IS_NO_ARGUMENT) { 
+                command = sm[24];
+                captured_flags.push_back(sm[24]);
+            }
+            else { 
+                command = sm[25];
+                captured_flags.push_back(sm[25]);
+            }
         }
-        else if (sm[17].matched) {
+        else if (sm[27].matched) {
             if (IS_DEBUG) cout << "LONG" << endl;
-            command = sm[17];
-            captured_flags.push_back(sm[18]);
             FLAG_COUNT[Mode::Long]++;
             mode = Mode::Long;
+            captured_flags.push_back(sm[28]);
+
+            if (!IS_NO_ARGUMENT) command = sm[27];
+            else command = sm[28];
         }
         else {
             if (IS_DEBUG) cout << "NO MATCH" << endl;
@@ -303,15 +316,19 @@ int add_flags_short_long(vector<string> & flags, boost::smatch sm) {
     Mode mode {};
 
     if (MODE == Mode::Short) { 
-        if (sm[6].matched) {
+        if (sm[8].matched) {
             if (IS_DEBUG) cout << "LS" << endl;
-            command = sm[6];
-            flag = sm[6];
+            flag = sm[8];
+
+            if (!IS_NO_ARGUMENT) command = sm[8];
+            else command = sm[9];
         }
-        else if (sm[7].matched) {
+        else if (sm[11].matched) {
             if (IS_DEBUG) cout << "SHORT OR SL" << endl;
-            command = sm[7];
-            flag = sm[7];
+            flag = sm[11];
+
+            if (!IS_NO_ARGUMENT) command = sm[11];
+            else command = sm[12];
         }
         else { 
             if (IS_DEBUG) cout << "NO MATCH" << endl;
@@ -321,15 +338,19 @@ int add_flags_short_long(vector<string> & flags, boost::smatch sm) {
         mode = Mode::Short;
     }
     else if (MODE == Mode::Long) {
-        if (sm[4].matched) {
+        if (sm[8].matched) {
             if (IS_DEBUG) cout << "SL" << endl;
-            command = sm[4];
-            flag = sm[4];   // Make --indicator-style=WORD and -p, --indicator-style=slash work (ls)
+            flag = sm[8];   // Make --indicator-style=WORD and -p, --indicator-style=slash work (ls)
+
+            if (!IS_NO_ARGUMENT) command = sm[8];
+            else command = sm[9];
         }
-        else if (sm[7].matched) {
+        else if (sm[11].matched) {
             if (IS_DEBUG) cout << "LONG OR LS" << endl;
-            command = sm[7];
-            flag = sm[8];
+            flag = sm[12];
+
+            if (!IS_NO_ARGUMENT) command = sm[11];
+            else command = sm[12];
         }
         else {
             if (IS_DEBUG) cout << "NO MATCH" << endl;
@@ -399,20 +420,33 @@ void get_flags(vector<string> & commands, string man_page) {
 
     string reg_final {};
 
+    // netstat has 3 spaces
+    // +command, -c command (nvim)
     string reg_start {R"(
-        (?:^[ ]{3,6})\K             # netstat has 3 spaces
-        (?:\+\w+,[ ](?=-\w))?\K     # +command, -c command (nvim)
+        (?:
+            (?:^[ ]{3,6})\K
+            (?:\+\w+,[ ](?=-\w))?\K
+        )
     )"};
 
+    // Start of the short for flag (e.g. -a)
+    // The flag name can contain a dash in the middle, e.g. -fcheck-new (gcc)
+    // The short flag can have arguments, e.g. -E ENCODING (rg) or -I[FMT] (date)
+    // E.g. -w max[,here,near] (traceroute)
+    // E.g. -O output-file (zip)
+    // E.g. -D [bind_address:]port (ssh)
+    // (1, 2?)
     string reg_short_helper {R"(
-        (?:-[#!?@$\w]+)                                         # Start of the short for flag (e.g. -a)
-        (?:-\w+)*                                               # The flag name can contain a dash in the middle, e.g. -fcheck-new (gcc)
-        (?:
+        (
+            (?:-[#!?@$.\w]+)
+            (?:-\w+)*
+        )
+        (
             (?:
-                (?:[\[\]_=<>?{}]|[ ](?![ ]|--|and[ ]--))|       # The short flag can have arguments, e.g. -E ENCODING (rg) or -I[FMT] (date)
-                ,(?![ \-])|                                     # E.g. -w max[,here,near] (traceroute)
-                -(?![\-])|                                      # E.g. -O output-file (zip)
-                :(?!\n)|                                        # E.g. -D [bind_address:]port (ssh)
+                (?:[\[\]_=<>?{}]|[ ](?![ ]|--|and[ ]--))|
+                ,(?![ \-])|
+                -(?![\-])|
+                :(?!\n)|
                 \w
             )+
         )?
@@ -425,17 +459,23 @@ void get_flags(vector<string> & commands, string man_page) {
         R"((?<!-[#?\w]\n[ ]{5}))"
         R"((?<!-[#?\w]\n[ ]{6}))" + reg_short_helper;
 
+    // Start of the long flag (e.g. --all)
+    // The flag name can contain a dash in the middle, e.g. --max-line-length (wc)
+    // The long flag can have arguments, e.g. --follow[={name|descriptor}] (tail)
+    // E.g. --host=[unix:///var/run/docker.sock] (docker)
+    // E.g. --temp-path path (zip)
+    // (1, 2?)
     string reg_long {R"(
         (
-            (?:--\w+)                    # Start of the long flag (e.g. --all)
-            (?:-\w+)*                    # The flag name can contain a dash in the middle, e.g. --max-line-length (wc)
+            (?:--\w+)
+            (?:-\w+)*
         ) 
         (
             (?:
-                [()\-\w\[\]{}|%+=<>."~]| # The long flag can have arguments, e.g. --follow[={name|descriptor}] (tail)
-                [,:](?![ ]|\n)|          # E.g. --host=[unix:///var/run/docker.sock] (docker)
+                [()\-\w\[\]{}|%+=<>?."~]|
+                [,:](?![ ]|\n)|
                 /(?![ ]-\w)|
-                [ ](?=\w|[\[\{\<\(])     # E.g. --temp-path path (zip)
+                [ ](?=\w|[\[\{\<\(])
             )+
         )?
     )"};
@@ -455,7 +495,7 @@ void get_flags(vector<string> & commands, string man_page) {
     string reg_end {R"(
         (?=
            $|
-           :([ ]|\n)|
+           :(?:[ ]|\n)|
            (?:[ ]|,[ ])-+|
            [ ]and[ ]|
            [ ]/[ ]|
@@ -465,7 +505,7 @@ void get_flags(vector<string> & commands, string man_page) {
         )
     )"};
 
-    // LONG-SHORT (want to capture SHORT)
+    // (1) + (rl) + (sep) + (rs) LONG-SHORT (want to capture SHORT)
     string reg_sls =
         "(?:" +
             reg_long + reg_sep +
@@ -473,7 +513,7 @@ void get_flags(vector<string> & commands, string man_page) {
         "(" + reg_short + ")" // Actual capture
     ;
 
-    // SHORT-LONG (want to capture LONG)
+    // (1) + (rs) + (sep) + (rl) SHORT-LONG (want to capture LONG)
     string reg_lsl =
         "(?:" +
             reg_short + reg_sep +
@@ -481,7 +521,7 @@ void get_flags(vector<string> & commands, string man_page) {
         "(" + reg_long + ")" // Actual capture
     ;
 
-    // SHORT-LONG (want to capture BOTH)
+    // (1, 2, 3) + (rs) + (sep) + (rl) SHORT-LONG (want to capture BOTH)
     string reg_sl = 
         "((" + reg_short + ")" + // Capture
             reg_sep +
@@ -489,7 +529,7 @@ void get_flags(vector<string> & commands, string man_page) {
         ")"
     ;
 
-    // LONG-SHORT (want to capture BOTH)
+    // (1, 2, 3) + (rl) + (sep) + (rs) LONG-SHORT (want to capture BOTH)
     string reg_ls =
         "((" + reg_long + ")" +  // Capture
             reg_sep +
@@ -498,36 +538,36 @@ void get_flags(vector<string> & commands, string man_page) {
     ;
 
     if (MODE == Mode::Short) {
-        reg_final = 
+        reg_final =                     // 0
             reg_start +
-            "(" +
-                reg_sls +
+            "(" +                       // 1
+                reg_sls +               // 2, 3, 4, 5, 6, 7, 8 (full), 9 (flag), 10 (arg)
                 "|" +
-                "(" + reg_short + ")" +
+                "(" + reg_short + ")" + // 11 (full), 12 (flag), 13 (arg)
             ")" +
             reg_end
         ;
     } else if (MODE == Mode::Long) {
-        reg_final = 
+        reg_final =                    // 0
             reg_start +
-            "(" +
-                reg_lsl +
+            "(" +                      // 1
+                reg_lsl +              // 2, 3, 4, 5, 6, 7, 8 (full), 9 (flag), 10 (arg)
                 "|" +
-                "(" + reg_long + ")" +
+                "(" + reg_long + ")" + // 11 (full), 12 (flag), 13 (arg)
             ")" +
             reg_end
         ;
     } else if (MODE == Mode::Mixed) {
-        reg_final = 
+        reg_final =                     // 0
             reg_start +
-            "(" +
-                reg_sl +
+            "(" +                       // 1
+                reg_sl +                // 2, 3 (full_s), 4 (flag_s), 5 (arg_s), 6, 7, 8, 9, 10 (full_l), 11 (flag_l), 12 (arg_l)
                 "|" +
-                reg_ls +
+                reg_ls +                // 13, 14 (full_l), 15 (flag_l), 16 (arg_l), 17, 18, 19, 20, 21 (full_s), 22 (flag_s), 23 (arg_s)
                 "|" +
-                "(" + reg_short + ")" +
+                "(" + reg_short + ")" + // 24 (full), 25 (flag), 26 (arg)
                 "|" +
-                "(" + reg_long +  ")" +
+                "(" + reg_long +  ")" + // 27 (full), 28 (flag), 29 (arg)
             ")" +
             reg_end
         ;
@@ -578,6 +618,10 @@ int set_program_options(int end, char ** av) {
 
         ("mixed-only,M", po::bool_switch()->default_value(false), "Show only flags that have both short and long notations")
 
+        ("no-argument,n", po::bool_switch()->default_value(false), "Don't include the flag arguments")
+
+        ("pretty", po::bool_switch()->default_value(false), "Alias for '-Mn -c 2 -e [] --color=auto'")
+
         ("reverse,r", po::bool_switch()->default_value(false), "Reverse the order of the output")
 
         ("short,s", po::bool_switch()->default_value(false), "Show short flag notation, e.g. -h")
@@ -621,6 +665,7 @@ int set_program_options(int end, char ** av) {
         if (!VM["mixed-only"].defaulted()) IS_MIXED_ONLY = true;
         if (!VM["title"].defaulted()) IS_TITLE = true;
         if (!VM["debug"].defaulted()) IS_DEBUG = true;
+        if (!VM["no-argument"].defaulted()) IS_NO_ARGUMENT = true;
 
         DELIMITER = VM["delimiter"].as<string>();
         if (DELIMITER == "\\n") DELIMITER = "\n";
@@ -639,6 +684,17 @@ int set_program_options(int end, char ** av) {
             auto it = kMODES.find(opt.string_key);
             if (it != kMODES.end())
                 MODE = it->second;
+        }
+        // Alias for '-Mn -c 2 -e [] --color=auto'
+        if (!VM["pretty"].defaulted()) {
+            IS_PRETTY = true;
+            IS_MIXED_ONLY = true;
+            IS_NO_ARGUMENT = true;
+            COLUMN_COUNT = 2;
+            ENCLOSE_COUNT = 2;
+            ENCLOSE = "[]";
+            VM.at("enclose").value() = string("[]");
+            VM.at("color").value() = string("auto");
         }
     } catch (const po::error & e) {
         throw string{e.what()};

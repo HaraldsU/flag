@@ -1778,16 +1778,68 @@ BOOST_AUTO_TEST_CASE(fzf) {
 }
 
 // rg (15.2.0)
-// BOOST_AUTO_TEST_CASE(rg) {
-    // vector<string> expected_short = {
-        // // " ", " ", " ", " ",
-    // };
-    // vector<string> expected_long = {
-    // };
-    // string command {"rg"};
-    // string title {"rg - recursively search the current directory for lines matching a pattern"};
-    // test_command(command, title, expected_short, expected_long);
-// }
+BOOST_AUTO_TEST_CASE(rg) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-e PATTERN", "-f PATTERNFILE", " ", " ",
+        "-z", "-s", " ", " ",
+        "-E ENCODING", " ", "-F", "-i",
+        "-v", "-x", "-m NUM", " ",
+        "-U", " ", " ", " ",
+        "-P", " ", "-S", " ",
+        "-a", "-j NUM", "-w", " ",
+        " ", " ", "-L", "-g GLOB",
+        " ", "-.", " ", " ",
+        " ", "-d NUM", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        "-t TYPE", "-T TYPE", " ", " ",
+        "-u", "-A NUM", "-B NUM", " ",
+        "-b", " ", " ", " ",
+        "-C NUM", " ", " ", " ",
+        " ", "-h", " ", " ",
+        " ", " ", "-n", "-N",
+        "-M NUM", " ", "-0", "-o",
+        " ", " ", "-p", "-q",
+        "-r REPLACEMENT", " ", " ", " ",
+        " ", "-H", "-I", " ",
+        "-c", " ", "-l", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", "-V" 
+    };
+    vector<string> expected_long = {
+        "--regexp=PATTERN", "--file=PATTERNFILE", "--pre=COMMAND", "--pre-glob=GLOB",
+        "--search-zip", "--case-sensitive", "--crlf", "--dfa-size-limit=NUM+SUFFIX?",
+        "--encoding=ENCODING", "--engine=ENGINE", "--fixed-strings", "--ignore-case",
+        "--invert-match", "--line-regexp", "--max-count=NUM", "--mmap",
+        "--multiline", "--multiline-dotall", "--no-unicode", "--null-data",
+        "--pcre2", "--regex-size-limit=NUM+SUFFIX?", "--smart-case", "--stop-on-nonmatch",
+        "--text", "--threads=NUM", "--word-regexp", "--auto-hybrid-regex",
+        "--no-pcre2-unicode", "--binary", "--follow", "--glob=GLOB",
+        "--glob-case-insensitive", "--hidden", "--iglob=GLOB", "--ignore-file=PATH", 
+        "--ignore-file-case-insensitive", "--max-depth=NUM", "--max-filesize=NUM+SUFFIX?", "--no-ignore",
+        "--no-ignore-dot", "--no-ignore-exclude", "--no-ignore-files", "--no-ignore-global",
+        "--no-ignore-parent", "--no-ignore-vcs", "--no-require-git", "--one-file-system",
+        "--type=TYPE", "--type-not=TYPE", "--type-add=TYPESPEC", "--type-clear=TYPE",
+        "--unrestricted", "--after-context=NUM", "--before-context=NUM", "--block-buffered",
+        "--byte-offset", "--color=WHEN", "--colors=COLOR_SPEC", "--column",
+        "--context=NUM", "--context-separator=SEPARATOR", "--field-context-separator=SEPARATOR", "--field-match-separator=SEPARATOR",
+        "--heading", "--help", "--hostname-bin=COMMAND", "--hyperlink-format=FORMAT",
+        "--include-zero", "--line-buffered", "--line-number", "--no-line-number",
+        "--max-columns=NUM", "--max-columns-preview", "--null", "--only-matching",
+        "--path-separator=SEPARATOR", "--passthru", "--pretty", "--quiet",
+        "--replace=REPLACEMENT", "--sort=SORTBY", "--sortr=SORTBY", "--trim",
+        "--vimgrep", "--with-filename", "--no-filename", "--sort-files",
+        "--count", "--count-matches", "--files-with-matches", "--files-without-match",
+        "--json", "--debug", "--no-ignore-messages", "--no-messages",
+        "--stats", "--trace", "--files", "--generate=KIND",
+        "--no-config", "--pcre2-version", "--type-list", "--version"
+    };
+    string command {"rg"};
+    string title {"rg - recursively search the current directory for lines matching a pattern"};
+    test_command(command, title, expected_short, expected_long);
+}
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE_END()
