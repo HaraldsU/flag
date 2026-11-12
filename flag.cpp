@@ -1,5 +1,5 @@
-#include <ios>
 #include "flag.h"
+#include <ios>
 #include <string>
 #include <stdio.h>
 #include <unistd.h>
@@ -102,8 +102,8 @@ int debug_print() {
     // --version
     cout << "Version: "       << VERSION       << endl;
 
-    // --word-count
-    cout << "Word count: "    << boolalpha     << IS_WORD_COUNT << endl;
+    // --flag-count
+    cout << "Flag count: "    << boolalpha     << IS_FLAG_COUNT << endl;
     cout << endl;
 
     return 0;
@@ -134,15 +134,13 @@ vector<string> get_n_longest_flags(const vector<string> commands) {
 }
 
 void print_flag_count() {
-    cout <<    "COUNT: "
-         << " | SF: " << FLAG_COUNT[Mode::Short]
-         << " | LF: " << FLAG_COUNT[Mode::Long]
-         << " | MF: " << FLAG_COUNT[Mode::Mixed]
-         << " | TT: " << FLAG_COUNT[Mode::Short] + FLAG_COUNT[Mode::Long] + FLAG_COUNT[Mode::Mixed]
-         << " |" << endl;
+    cout <<    "SF=" << FLAG_COUNT[Mode::Short]
+         << " | LF=" << FLAG_COUNT[Mode::Long]
+         << " | MF=" << FLAG_COUNT[Mode::Mixed]
+         << " | TT=" << FLAG_COUNT[Mode::Short] + FLAG_COUNT[Mode::Long] + FLAG_COUNT[Mode::Mixed] << endl;
 }
 
-string print_title(const string man_page) {
+string get_title(const string man_page) {
     string regx = R"(
         (?:^(?:NAME|Name)\n\s{2,})\K
         .*
@@ -209,10 +207,10 @@ void print_flags_helper(const vector<string> flags) {
 void print_flags(vector<string> commands, string man_page) {
     print_flags_helper(commands);
     if (IS_TITLE) { 
-        auto title = print_title(man_page); 
-        cout << "NAME: " << title << endl;
+        auto title = get_title(man_page); 
+        cout << title << endl;
     }
-    if (IS_WORD_COUNT) print_flag_count();
+    if (IS_FLAG_COUNT) print_flag_count();
 }
 
 
@@ -236,87 +234,141 @@ int reverse_flags(vector<string> & flags) {
     return 0;
 }
 
+int add_flags_mixed(vector<string> & flags, boost::smatch sm) {
+    string command {};
+    vector<string> captured_flags {};
+    Mode mode {};
+
+    if (sm[2].matched) {
+        if (IS_DEBUG) cout << "SL" << endl;
+        command = sm[3] + "," + sm[6];
+        captured_flags.push_back(sm[3]);
+        captured_flags.push_back(sm[6]);
+        FLAG_COUNT[Mode::Mixed]++;
+        mode = Mode::Mixed;
+    }
+    else if (sm[9].matched) {
+        if (IS_DEBUG) cout << "LS" << endl;
+        command = sm[15] + "," + sm[10];
+        captured_flags.push_back(sm[11]);
+        captured_flags.push_back(sm[15]);
+        FLAG_COUNT[Mode::Mixed]++;
+        mode = Mode::Mixed;
+    }
+    else if (!IS_MIXED_ONLY) {
+        if (sm[16].matched) {
+            if (IS_DEBUG) cout << "SHORT" << endl;
+            command = sm[16];
+            captured_flags.push_back(sm[16]);
+            FLAG_COUNT[Mode::Short]++;
+            mode = Mode::Short;
+        }
+        else if (sm[17].matched) {
+            if (IS_DEBUG) cout << "LONG" << endl;
+            command = sm[17];
+            captured_flags.push_back(sm[18]);
+            FLAG_COUNT[Mode::Long]++;
+            mode = Mode::Long;
+        }
+        else {
+            if (IS_DEBUG) cout << "NO MATCH" << endl;
+            return 1;
+        }
+    }
+    else return 1;
+
+    if (captured_flags.size() == 1) {
+        bool found = find(FLAGS_ONLY.begin(), FLAGS_ONLY.end(), captured_flags[0]) != FLAGS_ONLY.end();
+        if (!found) flags.push_back(command);
+        else FLAG_COUNT[mode]--;
+        FLAGS_ONLY.insert(captured_flags[0]);
+    }
+    else {
+        bool found1 = find(FLAGS_ONLY.begin(), FLAGS_ONLY.end(), captured_flags[0]) != FLAGS_ONLY.end();
+        bool found2 = find(FLAGS_ONLY.begin(), FLAGS_ONLY.end(), captured_flags[1]) != FLAGS_ONLY.end();
+
+        if (!found1 and !found2) flags.push_back(command);
+        else FLAG_COUNT[mode]--;
+
+        FLAGS_ONLY.insert(captured_flags[0]);
+        FLAGS_ONLY.insert(captured_flags[1]);
+    }
+
+    return 0;
+}
+
+int add_flags_short_long(vector<string> & flags, boost::smatch sm) {
+    string command {};
+    string flag {};
+    Mode mode {};
+
+    if (MODE == Mode::Short) { 
+        if (sm[6].matched) {
+            if (IS_DEBUG) cout << "LS" << endl;
+            command = sm[6];
+            flag = sm[6];
+        }
+        else if (sm[7].matched) {
+            if (IS_DEBUG) cout << "SHORT OR SL" << endl;
+            command = sm[7];
+            flag = sm[7];
+        }
+        else { 
+            if (IS_DEBUG) cout << "NO MATCH" << endl;
+            return 1;
+        }
+        FLAG_COUNT[Mode::Short]++;
+        mode = Mode::Short;
+    }
+    else if (MODE == Mode::Long) {
+        if (sm[4].matched) {
+            if (IS_DEBUG) cout << "SL" << endl;
+            command = sm[4];
+            flag = sm[4];   // Make --indicator-style=WORD and -p, --indicator-style=slash work (ls)
+        }
+        else if (sm[7].matched) {
+            if (IS_DEBUG) cout << "LONG OR LS" << endl;
+            command = sm[7];
+            flag = sm[8];
+        }
+        else {
+            if (IS_DEBUG) cout << "NO MATCH" << endl;
+            return 1;
+        }
+        FLAG_COUNT[Mode::Long]++;
+        mode = Mode::Long;
+    } 
+
+    bool found = find(FLAGS_ONLY.begin(), FLAGS_ONLY.end(), flag) != FLAGS_ONLY.end();
+    if (!found) flags.push_back(command);
+    else FLAG_COUNT[mode]--;
+    FLAGS_ONLY.insert(flag);
+
+    return 0;
+}
+
 void add_flags(vector<string> & flags, string man_page, string regx) {
     const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
     boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
 
     for (auto mr = sr_iterator; mr != boost::sregex_iterator(); mr++) {
-        string command {};
         auto sm = *mr;
 
-        if (IS_DEBUG) debug_print_sub_matches(sm); // DEBUG
+        if (IS_DEBUG) debug_print_sub_matches(sm);
 
-        if (MODE == Mode::Short) { 
-            if (sm[2].matched) {
-                if (IS_DEBUG) cout << "LS" << endl;
-                command = sm[2];
-            }
-            else if (sm[3].matched) {
-                if (IS_DEBUG) cout << "SHORT OR SL" << endl;
-                command = sm[3];
-            }
-            // else if (sm[2].matched) {
-                // if (IS_DEBUG) cout << "LLS" << endl;
-                // command = sm[2];
-            // }
-            else { 
-                if (IS_DEBUG) cout << "NO MATCH" << endl;
-                continue;
-            }
-            FLAG_COUNT[Mode::Short]++;
+        if (MODE == Mode::Short or MODE == Mode::Long) {
+            auto r = add_flags_short_long(flags, sm);
+            if (r == 1) continue;
         }
-
-        else if (MODE == Mode::Long) {
-            if (sm[2].matched) {
-                if (IS_DEBUG) cout << "SL" << endl;
-                command = sm[2];
-            }
-            else if (sm[3].matched) {
-                if (IS_DEBUG) cout << "LONG OR LS" << endl;
-                command = sm[3];
-            }
-            else {
-                if (IS_DEBUG) cout << "NO MATCH" << endl;
-                continue;
-            }
-            FLAG_COUNT[Mode::Long]++;
-        } 
-
         else if (MODE == Mode::Mixed) {
-            if (sm[2].matched) {
-                if (IS_DEBUG) cout << "LS" << endl;
-                command = sm[3] + "," + sm[4];
-                FLAG_COUNT[Mode::Mixed]++;
-            }
-            else if (sm[5].matched) {
-                if (IS_DEBUG) cout << "LLS" << endl;
-                command = sm[7] + "," + sm[6];
-                FLAG_COUNT[Mode::Mixed]++;
-            }
-            else if (!IS_MIXED_ONLY) {
-                if (sm[8].matched) {
-                    if (IS_DEBUG) cout << "SHORT" << endl;
-                    command = sm[8];
-                    FLAG_COUNT[Mode::Short]++;
-                }
-                else if (sm[9].matched) {
-                    if (IS_DEBUG) cout << "LONG" << endl;
-                    command = sm[9];
-                    FLAG_COUNT[Mode::Long]++;
-                }
-                else {
-                    if (IS_DEBUG) cout << "NO MATCH" << endl;
-                    continue;
-                }
-            }
-            else continue;
-        } else throw string{"invalid flag notation (expected short, long or mixed)"};
-        if (IS_DEBUG) cout << endl;
+            auto r = add_flags_mixed(flags, sm);
+            if (r == 1) continue;
+        } 
+        else throw string{"invalid flag notation (expected short, long or mixed)"};
 
-        // Remove duplicates
-        bool found = find(flags.begin(), flags.end(), command) != flags.end();
-        if (!found) flags.push_back(command);
+        if (IS_DEBUG) cout << endl;
     }
+
     if (IS_SORT) {
         try {
             sort_flags(flags);
@@ -324,6 +376,7 @@ void add_flags(vector<string> & flags, string man_page, string regx) {
             throw em;
         }
     }
+
     if (IS_REVERSE) {
         try {
             reverse_flags(flags);
@@ -366,21 +419,23 @@ void get_flags(vector<string> & commands, string man_page) {
     )"};
 
     string reg_short =
-        R"((?<!-[#?\w]\n[ ]{3}))" // This is to preven -? from matchin here (to enforce the no alias rule)
+        R"((?<!-[#?\w]\n[ ]{3}))" // This is to prevent -? from matching here (to enforce the no alias rule)
                                   // e.g. 2020 2020 202d 680a 2020 2020 202d 3f0a 2020 2020 202d 2d68 656c 700a (zip)
         R"((?<!-[#?\w]\n[ ]{4}))"
         R"((?<!-[#?\w]\n[ ]{5}))"
         R"((?<!-[#?\w]\n[ ]{6}))" + reg_short_helper;
 
     string reg_long {R"(
-        (?:--\w+)                           # Start of the long flag (e.g. --all)
-        (?:-\w+)*                           # The flag name can contain a dash in the middle, e.g. --max-line-length (wc)
-        (?:
+        (
+            (?:--\w+)                    # Start of the long flag (e.g. --all)
+            (?:-\w+)*                    # The flag name can contain a dash in the middle, e.g. --max-line-length (wc)
+        ) 
+        (
             (?:
-                [()\-\w\[\]{}|+=<>."~]|     # The long flag can have arguments, e.g. --follow[={name|descriptor}] (tail)
-                [,:](?![ ]|\n)|             # E.g. --host=[unix:///var/run/docker.sock] (docker)
+                [()\-\w\[\]{}|%+=<>."~]| # The long flag can have arguments, e.g. --follow[={name|descriptor}] (tail)
+                [,:](?![ ]|\n)|          # E.g. --host=[unix:///var/run/docker.sock] (docker)
                 /(?![ ]-\w)|
-                [ ](?=\w|[\[\{\<\(])        # E.g. --temp-path path (zip)
+                [ ](?=\w|[\[\{\<\(])     # E.g. --temp-path path (zip)
             )+
         )?
     )"};
@@ -486,21 +541,32 @@ void get_flags(vector<string> & commands, string man_page) {
 }
 
 
+/*
+    @retval ExitCode::Version if -v was set.
+    @retval ExitCode::Help if -h was set.
+    @retval 0 otherwise.
+
+    @throws If enclose count is not 0, 1 or 2, or there is a po:: parsing error
+*/
 int set_program_options(int end, char ** av) {
-    boost::program_options::options_description desc ("Usage: flag [flags] [argument]\nFlags", kCOLUMN_WIDTH);
+    boost::program_options::options_description desc (
+            "flag is a command-line tool for fast discovery of command flags from man pages.\n"
+            "See the man page for more information.\n\n"
+            "Usage: flag [flags] [arguments]\n"
+            "Flags", kCOLUMN_WIDTH);
     po::options_description hidden("Hidden options");
     po::options_description all;
 
     desc.add_options()
-        ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the first letter of the flag; WHEN is 'always', 'never', or 'auto'")
+        ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the output; WHEN is 'always', 'never' or 'auto'")
 
         ("column,c", po::value<int>()->value_name("COL")->implicit_value(1)->default_value(1, ""), "List entries by columns; COL specifies the column count")
 
-        ("delimiter,d", po::value<string>()->value_name("DEM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify DEM used for separating flags; the characters '\\n' and '\\t' retain special meaning")
+        ("delimiter,d", po::value<string>()->value_name("DEM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify the delimiter (DEL) used for separating flags; the characters '\\n' and '\\t' retain special meaning")
 
         ("debug,D", po::bool_switch()->default_value(false), "Show debug messages")
 
-        ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), "Specify ENC used for 'enclosing' the flag output (prepending and appending); 0, 1 or 2 arguments are expected, e.g. -e '|' or --enclose '{}'")
+        ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), "Specify characters (ENC) used for 'enclosing' the output (prepending and appending); 0, 1 or 2 arguments are expected")
 
         // ("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
 
@@ -512,17 +578,17 @@ int set_program_options(int end, char ** av) {
 
         ("mixed-only,M", po::bool_switch()->default_value(false), "Show only flags that have both short and long notations")
 
-        ("reverse,r", po::bool_switch()->default_value(false), "Reverse the sorting of the output")
+        ("reverse,r", po::bool_switch()->default_value(false), "Reverse the order of the output")
 
         ("short,s", po::bool_switch()->default_value(false), "Show short flag notation, e.g. -h")
 
-        ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default flag are sorted by the order of appearance)")
+        ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default the flags are sorted by the order of appearance)")
 
-        ("title,t", po::bool_switch()->default_value(false), "Show the man page NAME section at the bottom of the output")
+        ("title,t", po::bool_switch()->default_value(false), "Show a sentence from the man page NAME section")
 
         ("version,v", po::bool_switch()->default_value(false), "Display version information and exit")
 
-        ("word-count,w", po::bool_switch()->default_value(false), "Show the flag count at the bottom of the output")
+        ("flag-count,w", po::bool_switch()->default_value(false), "Show the flag count")
     ;
 
     try {
@@ -542,16 +608,16 @@ int set_program_options(int end, char ** av) {
 
         if (VM["version"].as<bool>() == true) {
             cout << "flag " << VERSION << endl;
-            return ExitCodes::Version;
+            return ExitCode::Version;
         }
         else if (VM["help"].as<bool>() == true or !VM.count("input")) {
             cout << desc << endl;
-            return ExitCodes::Help;
+            return ExitCode::Help;
         }
 
         if (!VM["reverse"].defaulted()) IS_REVERSE = true;
         if (!VM["sort"].defaulted()) IS_SORT = true;
-        if (!VM["word-count"].defaulted()) IS_WORD_COUNT = true;
+        if (!VM["flag-count"].defaulted()) IS_FLAG_COUNT = true;
         if (!VM["mixed-only"].defaulted()) IS_MIXED_ONLY = true;
         if (!VM["title"].defaulted()) IS_TITLE = true;
         if (!VM["debug"].defaulted()) IS_DEBUG = true;
@@ -563,7 +629,7 @@ int set_program_options(int end, char ** av) {
         if (VM["enclose"].as<string>().length() == 0) ENCLOSE_COUNT = 0;
         else if (VM["enclose"].as<string>().length() == 1) ENCLOSE_COUNT = 1;
         else if (VM["enclose"].as<string>().length() == 2) ENCLOSE_COUNT = 2;
-        else throw string{"'--enclose' excpects 0, 1 or 2 characters in the argument"};
+        else throw string{"'--[e]nclose' excpects 0, 1 or 2 characters in the argument"};
         ENCLOSE = VM["enclose"].as<string>();
 
         COLUMN_COUNT = VM["column"].as<int>();

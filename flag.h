@@ -1,4 +1,5 @@
 #pragma once
+#include <set>
 #include <string>
 #include <unistd.h>
 #include <boost/regex.hpp>
@@ -8,7 +9,7 @@
 
 using namespace std;
 
-namespace ExitCodes {
+namespace ExitCode {
     enum : int {
         Success = 0,
         Error = 1,
@@ -32,6 +33,7 @@ inline const unordered_map<string, Mode> kMODES {
 
 inline unordered_map<Mode, int> FLAG_COUNT      = {};
 inline boost::program_options::variables_map VM = {};
+inline set<string> FLAGS_ONLY                   = {};
 
 const inline int kCOLUMN_WIDTH                  = 100;
 const inline string VERSION                     = "1.0.0";
@@ -41,7 +43,7 @@ inline bool IS_MIXED_ONLY                       = false;
 inline bool IS_REVERSE                          = false;
 inline int  ENCLOSE_COUNT                       = 0;
 inline int  COLUMN_COUNT                        = 1;
-inline bool IS_WORD_COUNT                       = false;
+inline bool IS_FLAG_COUNT                       = false;
 inline bool IS_TITLE                            = false;
 inline bool IS_SORT                             = false;
 inline bool IS_DEBUG                            = false;
@@ -49,10 +51,10 @@ inline string DELIMITER                         = "\n";
 inline string ENCLOSE                           = "";
 
 int debug_print();
-string print_title(const string man_page);
 void print_flags_helper(const vector<string> flags);
 void print_flags(const vector<string> flags, const string man_page);
 
+string get_title(const string man_page);
 void get_flags(vector<string> & flags, const string man_page);
 
 int set_program_options(int end,char ** av);

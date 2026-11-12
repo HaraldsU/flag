@@ -34,11 +34,12 @@ void reset_globals() {
     IS_MIXED_ONLY = false;
     IS_REVERSE    = false;
     ENCLOSE_COUNT = 2;
-    IS_WORD_COUNT = false;
+    IS_FLAG_COUNT = false;
     IS_TITLE      = false;
     IS_SORT       = false;
     IS_DEBUG      = false;
     FLAG_COUNT.clear();
+    FLAGS_ONLY.clear();
 }
 
 struct CaptureCout {
@@ -77,7 +78,7 @@ struct Args {
         const string command, 
         const string man_page
     ) {
-        reset_globals_and_set_options(command.c_str());
+        reset_globals_and_set_options(command.c_str()) == 0 ? void() : std::exit(1);
         vector<string> actual {};
         get_flags(actual, man_page);
 
@@ -99,10 +100,10 @@ struct Args {
         const string title, 
         const string man_page
     ) {
-        BOOST_TEST(print_title(man_page) == title);
+        BOOST_TEST(get_title(man_page) == title);
     }
 
-    // Test the --[w]ord-count flag
+    // Test the -w|--flag-count flag
     void test_flag_count(
         string command,
         vector<string> exp_s, 
@@ -112,7 +113,7 @@ struct Args {
     ) {
         if (command.find("flag -s ") != std::string::npos) BOOST_TEST(exp_s.size() == FLAG_COUNT[Mode::Short]);
         else if (command.find("flag -l ") != std::string::npos) BOOST_TEST(exp_l.size() == FLAG_COUNT[Mode::Long]);
-        else if (command.find("flag -m ") != std::string::npos) BOOST_TEST( exp_m.size() == FLAG_COUNT[Mode::Short] + FLAG_COUNT[Mode::Long] + FLAG_COUNT[Mode::Mixed]);
+        else if (command.find("flag -m ") != std::string::npos) BOOST_TEST(exp_m.size() == FLAG_COUNT[Mode::Short] + FLAG_COUNT[Mode::Long] + FLAG_COUNT[Mode::Mixed]);
         else if (command.find("flag -M ") != std::string::npos) BOOST_TEST(exp_mo.size() == FLAG_COUNT[Mode::Mixed]);
         else cout << "FLAG COUNT TEST ERROR" << endl;
     }
@@ -313,7 +314,7 @@ BOOST_AUTO_TEST_CASE(help) {
         out = capture.str();
     }
     BOOST_TEST(!VM["help"].defaulted());
-    BOOST_TEST(rc == ExitCodes::Help);
+    BOOST_TEST(rc == ExitCode::Help);
     BOOST_TEST(out.length() > 0);
 }
 
@@ -359,12 +360,12 @@ BOOST_AUTO_TEST_CASE(version) {
         out = capture.str();
     }
     BOOST_TEST(VM.count("version"));
-    BOOST_TEST(rc == ExitCodes::Version);
+    BOOST_TEST(rc == ExitCode::Version);
     BOOST_TEST(out == "flag " + VERSION + "\n");
 }
 
 BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
-    Input input("flag --color=always --enclose [] --column 3 --mixed-only --sort --reverse --title --word-count ls");
+    Input input("flag --color=always --enclose [] --column 3 --mixed-only --sort --reverse --title --flag-count ls");
     BOOST_TEST(input.ac == 12);
     BOOST_TEST(string(input.av[0]) == "flag");
     BOOST_TEST(string(input.av[1]) == "--color=always");
@@ -376,7 +377,7 @@ BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
     BOOST_TEST(string(input.av[7]) == "--sort");
     BOOST_TEST(string(input.av[8]) == "--reverse");
     BOOST_TEST(string(input.av[9]) == "--title");
-    BOOST_TEST(string(input.av[10]) == "--word-count");
+    BOOST_TEST(string(input.av[10]) == "--flag-count");
     BOOST_TEST(string(input.av[11]) == "ls");
     BOOST_TEST(input.av[input.ac] == nullptr);
 }
@@ -1701,6 +1702,92 @@ BOOST_AUTO_TEST_CASE(zip) {
     string title {"zip - package and compress (archive) files"};
     test_command(command, title, expected_short, expected_long);
 }
+
+// fzf (0.74.5)
+BOOST_AUTO_TEST_CASE(fzf) {
+    vector<string> expected_short = {
+        // " ", " ", " ", " ",
+        "-x", "-e", "-i", " ",   // +i, --no-ignore-case ???
+        " ", " ", " ", "-n",
+        " ", " ", "-d", " ",     // +s, --no-sort
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",     // 24
+        " ", " ", "-m", " ",    // +m, --no-multi
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",     // 60
+        " ", " ", "-q", "-1",
+        "-0", "-f", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", " ", " ", " ",
+        " ", "-2"               // This flag shouldn't be here but is ambigous
+    };
+    vector<string> expected_long = {
+        "--extended", "--exact", "--ignore-case", "--smart-case",
+        "--literal", "--scheme=SCHEME", "--algo=TYPE", "--nth=N[,..]",
+        "--with-nth=N[,..] or TEMPLATE", "--accept-nth=N[,..] or TEMPLATE", "--delimiter=STR", "--tail=NUM",
+        "--disabled", "--tiebreak=CRI[,..]", "--read0", "--print0",
+        "--ansi", "--sync", "--no-tty-default", "--style=PRESET",
+        "--color=[BASE_SCHEME][,COLOR_NAME[:ANSI_COLOR][:ANSI_ATTRIBUTES]]...", "--no-color", "--no-bold", "--black",
+        "--height=[~][-]HEIGHT[%]", "--min-height=HEIGHT[+]", "--popup[=[center|top|bottom|left|right][,SIZE[%]][,SIZE[%]][,border-native]]", "--layout=LAYOUT",
+        "--reverse", "--margin=MARGIN", "--padding=PADDING", "--border[=STYLE]",
+        "--border-label[=LABEL]", "--border-label-pos[=N[:top|bottom]]", "--multi[=MAX]", "--highlight-line", 
+        "--cycle", "--wrap[=MODE]", "--wrap-sign=INDICATOR", "--no-multi-line", 
+        "--raw", "--track", "--id-nth=N[,..]", "--tac", 
+        "--gap[=N]", "--gap-line[=STR]", "--freeze-left=N", "--freeze-right=N", 
+        "--keep-right", "--scroll-off=LINES", "--no-hscroll", "--hscroll-off=COLS", 
+        "--jump-labels=CHARS", "--gutter=CHAR", "--gutter-raw=CHAR", "--pointer=STR",
+        "--marker=STR", "--marker-multi-line=STR", "--ellipsis=STR", "--tabstop=SPACES",
+        "--scrollbar=CHAR1[CHAR2]", "--no-scrollbar", "--list-border[=STYLE]", "--list-label[=LABEL]",
+        "--list-label-pos[=N[:top|bottom]]", "--no-input", "--prompt=STR", "--info=STYLE",
+        "--info-command=COMMAND", "--no-info", "--separator=STR", "--no-separator",
+        "--ghost=TEXT", "--filepath-word", "--input-border[=STYLE]", "--input-label[=LABEL]",
+        "--input-label-pos[=N[:top|bottom]]", "--preview=COMMAND", "--preview-border[=STYLE]", "--preview-label[=LABEL]",
+        "--preview-wrap-sign=INDICATOR", "--preview-label-pos[=N[:top|bottom]]", "--preview-window=[POSITION][,SIZE[%]][,border-STYLE][,[no]wrap][,wrap-word][,[no]follow][,[no]cycle][,[no]info][,[no]hidden][,+SCROLL[OFFSETS][/DENOM]][,~HEADER_LINES][,default][,<SIZE_THRESHOLD(ALTERNATIVE_LAYOUT)]", "--header=STR", 
+        "--header-lines=N", "--header-first", "--header-border[=STYLE]", "--header-label[=LABEL]",
+        "--header-label-pos[=N[:top|bottom]]", "--header-lines-border[=STYLE]", "--footer=STR", "--footer-border[=STYLE]",
+        "--footer-label[=LABEL]", "--footer-label-pos[=N[:top|bottom]]", "--query=STR", "--select-1",
+        "--exit-0", "--filter=STR", "--print-query", "--expect=KEY[,..]", 
+        "--no-clear", "--bind=BINDINGS", "--with-shell=STR", "--listen[=SOCKET_PATH|[ADDR:]PORT]", 
+        "--threads=N", "--bench=DURATION", "--walker=[file][,dir][,follow][,hidden]", "--walker-root=DIR [...]", 
+        "--walker-skip=DIRS", "--history=HISTORY_FILE", "--history-size=N", "--bash", 
+        "--zsh", "--fish", "--nushell", "--no-mouse", 
+        "--no-unicode", "--ambidouble", "--version", "--help", 
+        "--man", " "
+    };
+    string command {"fzf"};
+    string title {"fzf - a command-line fuzzy finder"};
+    test_command(command, title, expected_short, expected_long);
+}
+
+// rg (15.2.0)
+// BOOST_AUTO_TEST_CASE(rg) {
+    // vector<string> expected_short = {
+        // // " ", " ", " ", " ",
+    // };
+    // vector<string> expected_long = {
+    // };
+    // string command {"rg"};
+    // string title {"rg - recursively search the current directory for lines matching a pattern"};
+    // test_command(command, title, expected_short, expected_long);
+// }
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE_END()
