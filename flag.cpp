@@ -614,13 +614,13 @@ int set_program_options(int end, char ** av) {
 
         ("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. --help")
 
-        ("mixed,m", po::bool_switch()->default_value(true), "Show mixed flag notation, e.g. -h|--help")
+        ("mixed,m", po::bool_switch()->default_value(false), "Show mixed flag notation, e.g. -h|--help")
 
         ("mixed-only,M", po::bool_switch()->default_value(false), "Show only flags that have both short and long notations")
 
         ("no-argument,n", po::bool_switch()->default_value(false), "Don't include the flag arguments")
 
-        ("pretty,p", po::bool_switch()->default_value(false), "Alias for '-Mn -c 2 -e [] --color=auto'")
+        ("pretty,p", po::bool_switch()->default_value(false), "Alias for '-Mn -c 2 -e [] --color=always'")
 
         ("reverse,r", po::bool_switch()->default_value(false), "Reverse the order of the output")
 
@@ -650,19 +650,25 @@ int set_program_options(int end, char ** av) {
         po::store(parsed, VM);
         po::notify(VM); 
 
-        if (VM["version"].as<bool>() == true) {
-            cout << "flag " << VERSION << endl;
-            return ExitCode::Version;
-        }
-        else if (VM["help"].as<bool>() == true or !VM.count("input")) {
-            cout << desc << endl;
-            return ExitCode::Help;
-        }
+		for (auto it = parsed.options.rbegin(); it != parsed.options.rend(); it++) {
+			if (it->string_key == "version") {
+				cout << "flag " << VERSION << endl;
+				return ExitCode::Version;
+			}
+			else if (it->string_key == "help") {
+				cout << desc << endl;
+				return ExitCode::Help;
+			}
+		}
+
+		if (!VM.count("input")) {
+			cout << desc << endl;
+			return ExitCode::Help;
+		}
 
         if (!VM["reverse"].defaulted()) IS_REVERSE = true;
         if (!VM["sort"].defaulted()) IS_SORT = true;
         if (!VM["flag-count"].defaulted()) IS_FLAG_COUNT = true;
-        if (!VM["mixed-only"].defaulted()) IS_MIXED_ONLY = true;
         if (!VM["title"].defaulted()) IS_TITLE = true;
         if (!VM["debug"].defaulted()) IS_DEBUG = true;
         if (!VM["no-argument"].defaulted()) IS_NO_ARGUMENT = true;
@@ -679,12 +685,27 @@ int set_program_options(int end, char ** av) {
 
         COLUMN_COUNT = VM["column"].as<int>();
 
-        MODE = Mode::Mixed;
-        for (const auto& opt : parsed.options) {
-            auto it = kMODES.find(opt.string_key);
-            if (it != kMODES.end())
-                MODE = it->second;
-        }
+		MODE = Mode::Mixed;	// Default is -m
+		for (auto it = parsed.options.rbegin(); it != parsed.options.rend(); it++) {
+			if (it->string_key == "long") {
+				MODE = Mode::Long;
+				break;
+			}
+			else if (it->string_key == "short") {
+				MODE = Mode::Short;
+				break;
+			}
+			else if (it->string_key == "mixed") {
+				MODE = Mode::Mixed;
+				break;
+			}
+			else if (it->string_key == "mixed-only") {
+				MODE = Mode::Mixed;
+				IS_MIXED_ONLY = true;
+				break;
+			}
+		}
+
         // Alias for '-Mn -c 2 -e [] --color=auto'
         if (!VM["pretty"].defaulted()) {
             IS_PRETTY = true;
@@ -694,7 +715,7 @@ int set_program_options(int end, char ** av) {
             ENCLOSE_COUNT = 2;
             ENCLOSE = "[]";
             VM.at("enclose").value() = string("[]");
-            VM.at("color").value() = string("auto");
+            VM.at("color").value() = string("always");
         }
     } catch (const po::error & e) {
         throw string{e.what()};
@@ -714,7 +735,7 @@ string set_man_page() {
     while (fgets(buf, 1024, po)) man_page.append(buf);
     pclose(po);
 
-    if (man_page.size() == 0) throw string{"man page for command \"" + input + "\" not found"};
+    if (man_page.size() == 0) throw string{"man page for command '" + input + "' not found"};
 
     return man_page;
 }

@@ -30,14 +30,15 @@ void remove_spaces(vector<string> & v) {
 
 void reset_globals() {
     VM.clear();
-    MODE          = Mode::Mixed;
-    IS_MIXED_ONLY = false;
-    IS_REVERSE    = false;
-    ENCLOSE_COUNT = 2;
-    IS_FLAG_COUNT = false;
-    IS_TITLE      = false;
-    IS_SORT       = false;
-    IS_DEBUG      = false;
+    MODE			  = Mode::Mixed;
+    IS_MIXED_ONLY	  = false;
+    IS_REVERSE		  = false;
+    ENCLOSE_COUNT	  = 2;
+    IS_FLAG_COUNT	  = false;
+    IS_TITLE		  = false;
+    IS_SORT			  = false;
+    IS_DEBUG		  = false;
+	IS_NO_ARGUMENT    = false;
     FLAG_COUNT.clear();
     FLAGS_ONLY.clear();
 }
@@ -68,8 +69,7 @@ struct Input {
 struct Args {
     Args() { }
 
-    int reset_globals_and_set_options(string command) {
-        reset_globals();
+    int set_options(string command) {
         Input input(("flag " + command).c_str());
         return set_program_options(input.ac, input.av);
     }
@@ -78,7 +78,8 @@ struct Args {
         const string command, 
         const string man_page
     ) {
-        reset_globals_and_set_options(command.c_str()) == 0 ? void() : std::exit(1);
+		reset_globals();
+        set_options(command.c_str()) == 0 ? void() : std::exit(1);
         vector<string> actual {};
         get_flags(actual, man_page);
 
@@ -170,7 +171,8 @@ struct Args {
         vector<string> exp_l
     ) {
 		try {
-            reset_globals_and_set_options(command);
+			reset_globals();
+            set_options(command);
 			vector<string> expected_mixed = {};
 			vector<string> expected_mixed_only = {};
 			make_mixed_from_short_and_long(exp_s, exp_l, expected_mixed, expected_mixed_only);
@@ -210,12 +212,13 @@ BOOST_AUTO_TEST_CASE(color) {
     string flag_me2 = "[-a|--all]";
     add_colors(flag_me2, 3);
     BOOST_TEST(flag_me2 == "\033[0m\033[33m[\033[31m-a\033[33m|\033[32m--all\033[33m]\033[0m");
+	reset_globals();
 }
 
 // Test the --[c]olumn flag
 BOOST_AUTO_TEST_CASE(column) {
     string command1 {"flag --column 1 --delimiter '" + DELIMITER + "' ls"};
-    reset_globals_and_set_options(command1);
+    set_options(command1);
     auto man_page = set_man_page();
     auto actual1 = get_command_flags(command1, man_page);
     string out1;
@@ -227,7 +230,7 @@ BOOST_AUTO_TEST_CASE(column) {
     BOOST_TEST(!VM["column"].defaulted());
 
     string command2 {"flag --column 3 -delimiter '" + DELIMITER + "' ls"};
-    reset_globals_and_set_options(command2);
+    set_options(command2);
     auto actual2 = get_command_flags(command2, man_page);
     string out2;
     {
@@ -238,6 +241,7 @@ BOOST_AUTO_TEST_CASE(column) {
     BOOST_TEST(!VM["column"].defaulted());
 
     BOOST_TEST(out1.size() != out2.size());
+	reset_globals();
 }
 
 // Test the --[d]elimiter flag
@@ -251,7 +255,7 @@ BOOST_AUTO_TEST_CASE(delimiter) {
     for (auto & [del, out] : cases) {
         DELIMITER = del;
         string command {"flag --delimiter '" + DELIMITER + "' pwd"};
-        reset_globals_and_set_options(command);
+        set_options(command);
         auto man_page = set_man_page();
         auto actual1 = get_command_flags(command, man_page);
         {
@@ -266,6 +270,7 @@ BOOST_AUTO_TEST_CASE(delimiter) {
         if (del == "\n") BOOST_TEST(actual1.size() == hits.size());
         else BOOST_TEST(actual1.size() - 1 == hits.size()); // If we have a delimiter like ',' it is removed from the last occurence
     }
+	reset_globals();
 }
 
 // Test the -D|--debug flag
@@ -275,11 +280,12 @@ BOOST_AUTO_TEST_CASE(debug) {
     string out;
     {
         CaptureCout capture;
-        rc = reset_globals_and_set_options(command);
+        rc = set_options(command);
         out = capture.str();
     }
     BOOST_TEST(!VM["debug"].defaulted());
     BOOST_TEST(rc == 0);
+	reset_globals();
 }
 
 // Test the --[e]nclose flag
@@ -301,6 +307,7 @@ BOOST_AUTO_TEST_CASE(enclose) {
     string flag_e2 = "-a|--all";
     add_enclosing(flag_e2);
     BOOST_TEST(flag_e2 == "[-a|--all]");
+	reset_globals();
 }
 
 // Test the --[h]elp flag
@@ -310,27 +317,84 @@ BOOST_AUTO_TEST_CASE(help) {
     string out;
     {
         CaptureCout capture;
-        rc = reset_globals_and_set_options(command);
+        rc = set_options(command);
         out = capture.str();
     }
     BOOST_TEST(!VM["help"].defaulted());
     BOOST_TEST(rc == ExitCode::Help);
     BOOST_TEST(out.length() > 0);
+	reset_globals();
+}
+
+// Test the --[n]o-argument flag
+BOOST_AUTO_TEST_CASE(no_argument) {
+	{
+		vector<string> exp_s_od = {
+			// " ", " ", " ", " ",
+			"-A", "-j", "-N", "-S", 
+			"-t", "-v", "-w", "-a",
+			"-b", "-c", "-d", "-f",
+			"-i", "-l", "-o", "-s",
+			"-x" 
+		};
+		string command = "flag -ns od";
+		set_options(command);
+		auto man_page = set_man_page();
+		auto act = get_command_flags(command, man_page);
+
+		BOOST_CHECK_EQUAL_COLLECTIONS(act.begin(), act.end(), exp_s_od.begin(), exp_s_od.end());
+		reset_globals();
+	}
+
+	{
+		vector<string> exp_l_od = {
+			// " ", " ", " ", " ",
+			"--address-radix", "--endian", "--skip-bytes", "--read-bytes",
+			"--strings", "--format", "--output-duplicates", "--width",
+			"--traditional", "--help", "--version"	
+		};
+		string command = "flag -nl od";
+		set_options(command);
+		auto man_page = set_man_page();
+		auto act = get_command_flags(command, man_page);
+
+		BOOST_CHECK_EQUAL_COLLECTIONS(act.begin(), act.end(), exp_l_od.begin(), exp_l_od.end());
+		reset_globals();
+	}
+}
+
+// Test the --[p]retty flag
+BOOST_AUTO_TEST_CASE(pretty) {
+    string command = "flag --pretty ls";
+	set_options(command);
+
+	BOOST_TEST(IS_PRETTY == true);
+	BOOST_TEST(IS_MIXED_ONLY == true);
+	BOOST_TEST(IS_NO_ARGUMENT == true);
+	BOOST_TEST(COLUMN_COUNT == 2);
+	BOOST_TEST(ENCLOSE_COUNT == 2);
+	BOOST_TEST(ENCLOSE == "[]");
+	BOOST_TEST(VM["enclose"].as<string>() == string("[]"));
+	BOOST_TEST(VM["color"].as<string>() == string("always"));
+
+	reset_globals();
 }
 
 // Test the --[r]everse flag
 BOOST_AUTO_TEST_CASE(reverse) {
     string command1 = "flag wc";
-    reset_globals_and_set_options(command1);
+    set_options(command1);
     auto man_page = set_man_page();
     auto regular = get_command_flags(command1, man_page);
 
     string command2 = "flag -r wc";
-    reset_globals_and_set_options(command2);
+    set_options(command2);
     auto reversed = get_command_flags(command2, man_page);
 
     for (size_t i = 0; i < regular.size(); i++)
         BOOST_TEST(regular[i] == reversed[regular.size() - i - 1]);
+
+	reset_globals();
 }
 
 // Test the -S|--sort flag
@@ -342,11 +406,12 @@ BOOST_AUTO_TEST_CASE(sort) {
     };
 
     string command = "flag -S wc";
-    reset_globals_and_set_options(command);
+    set_options(command);
     auto man_page = set_man_page();
     auto sorted_act_wc = get_command_flags(command, man_page);
 
     BOOST_CHECK_EQUAL_COLLECTIONS(sorted_act_wc.begin(), sorted_act_wc.end(), sorted_exp_wc.begin(), sorted_exp_wc.end());
+	reset_globals();
 }
 
 // Test the --[v]ersion flag
@@ -356,12 +421,13 @@ BOOST_AUTO_TEST_CASE(version) {
     string out;
     {
         CaptureCout capture;
-        rc = reset_globals_and_set_options(command);
+        rc = set_options(command);
         out = capture.str();
     }
     BOOST_TEST(VM.count("version"));
     BOOST_TEST(rc == ExitCode::Version);
     BOOST_TEST(out == "flag " + VERSION + "\n");
+	reset_globals();
 }
 
 BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
@@ -380,10 +446,11 @@ BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
     BOOST_TEST(string(input.av[10]) == "--flag-count");
     BOOST_TEST(string(input.av[11]) == "ls");
     BOOST_TEST(input.av[input.ac] == nullptr);
+	reset_globals();
 }
 
 BOOST_AUTO_TEST_CASE(set_man_page_ls) {
-    string command = "flag --short --delimiter '\n' ls";
+    string command = "flag ls";
     Input input(command.c_str());
     {
         CaptureCout capture;
@@ -391,6 +458,7 @@ BOOST_AUTO_TEST_CASE(set_man_page_ls) {
     }
     auto man_page = set_man_page();
     BOOST_TEST(man_page.length() > 0);
+	reset_globals();
 }
 
 BOOST_AUTO_TEST_SUITE(coreutils) // (coreutils 9.12)
