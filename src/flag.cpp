@@ -76,12 +76,12 @@ int debug_print() {
     // --delimiter
     cout << "Delimiter: "     << "'"           << escape(VM["delimiter"].as<string>()) << "'" << endl;
 
+    // --debug
+    cout << "Debug: "         << boolalpha     << IS_DEBUG   << endl;
+
     // --enclose
     cout << "Enclose count: " << ENCLOSE_COUNT << endl;
     cout << "Enclose: "       << "'" << VM["enclose"].as<string>() << "'" << endl;
-
-    // --debug
-    cout << "Debug: "         << boolalpha     << IS_DEBUG   << endl;
 
     // Modes (--long, --mixed, --mixed-only, --short)
     auto m = int(MODE) == 0 ? "short"
@@ -89,6 +89,12 @@ int debug_print() {
         : "mixed";
     cout << "Mode: "          << int(MODE)     << " (" << m << ")" << endl;
     cout << "Mixed-only: "    << boolalpha     << IS_MIXED_ONLY << endl;
+
+    // --no-argument
+    cout << "No argument: "   << boolalpha     << IS_NO_ARGUMENT << endl;
+
+    // --pretty
+    cout << "Pretty: "        << boolalpha     << IS_PRETTY << endl;
 
     // --reverse
     cout << "Reverse: "       << boolalpha     << IS_REVERSE << endl;
@@ -99,11 +105,12 @@ int debug_print() {
     // --title
     cout << "Title: "         << boolalpha     << IS_TITLE      << endl;
 
+    // --flag-count
+    cout << "Flag count: "    << boolalpha     << IS_FLAG_COUNT << endl;
+
     // --version
     cout << "Version: "       << VERSION       << endl;
 
-    // --flag-count
-    cout << "Flag count: "    << boolalpha     << IS_FLAG_COUNT << endl;
     cout << endl;
 
     return 0;
@@ -620,7 +627,7 @@ int set_program_options(int end, char ** av) {
 
         ("no-argument,n", po::bool_switch()->default_value(false), "Don't include the flag arguments")
 
-        ("pretty,p", po::bool_switch()->default_value(false), "Alias for '-Mn -c 2 -e [] --color=always'")
+        ("pretty,p", po::bool_switch()->default_value(false), "Alias for '--color=always --enclose=[]'")
 
         ("reverse,r", po::bool_switch()->default_value(false), "Reverse the order of the output")
 
@@ -706,12 +713,9 @@ int set_program_options(int end, char ** av) {
 			}
 		}
 
-        // Alias for '-Mn -c 2 -e [] --color=auto'
+        // Alias for '--color=always --enclose=[]
         if (!VM["pretty"].defaulted()) {
             IS_PRETTY = true;
-            IS_MIXED_ONLY = true;
-            IS_NO_ARGUMENT = true;
-            COLUMN_COUNT = 2;
             ENCLOSE_COUNT = 2;
             ENCLOSE = "[]";
             VM.at("enclose").value() = string("[]");

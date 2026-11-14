@@ -369,9 +369,6 @@ BOOST_AUTO_TEST_CASE(pretty) {
 	set_options(command);
 
 	BOOST_TEST(IS_PRETTY == true);
-	BOOST_TEST(IS_MIXED_ONLY == true);
-	BOOST_TEST(IS_NO_ARGUMENT == true);
-	BOOST_TEST(COLUMN_COUNT == 2);
 	BOOST_TEST(ENCLOSE_COUNT == 2);
 	BOOST_TEST(ENCLOSE == "[]");
 	BOOST_TEST(VM["enclose"].as<string>() == string("[]"));
