@@ -59,6 +59,7 @@ inline string ENCLOSE                           = "";
 int debug_print();
 void print_flags_helper(const vector<string> flags);
 void print_flags(const vector<string> flags, const string man_page);
+void print_help(const boost::program_options::options_description desc);
 
 string get_title(const string man_page);
 void get_flags(vector<string> & flags, const string man_page);

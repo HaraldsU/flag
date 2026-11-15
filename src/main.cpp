@@ -14,13 +14,6 @@ int main(int ac, char ** av) {
         get_flags(commands, man_page);
         print_flags(commands, man_page);
 
-        // cout << "**********************" << endl;
-        // cout << "***** FLAGS ONLY *****" << endl;
-        // cout << "**********************" << endl;
-        // for (auto el : FLAGS_ONLY) {
-            // cout << el << endl;
-        // }
-
         return 0;
     } catch (const string & em) {
         cout << "Flag: " << em << endl;

@@ -220,6 +220,50 @@ void print_flags(vector<string> commands, string man_page) {
     if (IS_FLAG_COUNT) print_flag_count();
 }
 
+void print_help(const po::options_description desc) {
+    string flag_sep = ", ";
+    string desc_sep = "  ";
+    char start = ' ';
+    int start_repeat = 4;
+    size_t desc_offset = 25;
+
+    cout << "flag is a command-line tool for fast discovery of command flags from man pages." << endl
+         << "See flag(1) for more information." << endl << endl
+         << "Usage: flag [flags] [arguments]" << endl
+         << "Flags:" << endl;
+
+    for (auto opt : desc.options()) {
+        auto flag_s = opt->canonical_display_name(po::command_line_style::allow_dash_for_short);
+        auto flag_l = opt->canonical_display_name(po::command_line_style::allow_long);
+        auto flag_arg = opt->format_parameter();
+        bool is_short = false;
+        bool is_long = false;
+        string output = string(start_repeat, start);
+
+        if (flag_s[0] == '-') is_short = true;
+        if (flag_l[0] == '-' and flag_l[1] == '-') is_long = true;
+
+        if (is_short) output += flag_s;
+        if (is_short and is_long) output += flag_sep;
+        if (is_long) {
+            output += flag_l;
+            for (size_t i = 1; i < flag_arg.length(); i++) {
+                if (flag_arg[i] != '(') output += flag_arg[i];
+                else break;
+            }
+        }
+
+        if (output.length() + 1 < desc_offset) output += string(desc_offset - output.length(), start);
+        else output += " ";
+
+        output += desc_sep;
+        output += opt->description();
+
+        cout << output << endl;
+    }
+    cout << endl;
+}
+
 
 int sort_flags(vector<string> & flags) {
     try {
@@ -596,50 +640,63 @@ void get_flags(vector<string> & commands, string man_page) {
     @throws If enclose count is not 0, 1 or 2, or there is a po:: parsing error
 */
 int set_program_options(int end, char ** av) {
-    boost::program_options::options_description desc (
-            "flag is a command-line tool for fast discovery of command flags from man pages.\n"
-            "See the man page for more information.\n\n"
-            "Usage: flag [flags] [arguments]\n"
-            "Flags", kCOLUMN_WIDTH);
+    boost::program_options::options_description desc {};
     po::options_description hidden("Hidden options");
     po::options_description all;
 
     desc.add_options()
-        ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), "Use markers to highlight the output; WHEN is 'always', 'never' or 'auto'")
+        ("color", po::value<string>()->value_name("WHEN")->implicit_value("never")->default_value("never", ""), 
+         "Use markers to highlight the output")
 
-        ("column,c", po::value<int>()->value_name("COL")->implicit_value(1)->default_value(1, ""), "List entries by columns; COL specifies the column count")
+        ("column,c", po::value<int>()->value_name("N")->implicit_value(1)->default_value(1, ""), 
+         "List entries by columns")
 
-        ("delimiter,d", po::value<string>()->value_name("DEM")->implicit_value("'\\n'")->default_value("\n", ""), "Specify the delimiter (DEL) used for separating flags; the characters '\\n' and '\\t' retain special meaning")
+        ("delimiter,d", po::value<string>()->value_name("DEM")->implicit_value("'\\n'")->default_value("\n", ""), 
+         "Specify delimiter used for separating flags")
 
-        ("debug,D", po::bool_switch()->default_value(false), "Show debug messages")
+        ("debug,D", po::bool_switch()->default_value(false), 
+         "Show debug messages")
 
-        ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), "Specify characters (ENC) used for 'enclosing' the output (prepending and appending); 0, 1 or 2 arguments are expected")
+        ("enclose,e", po::value<string>()->value_name("ENC")->implicit_value("''")->default_value("", ""), 
+         "Specify characters used for enclosing the output")
 
         // ("full,f", po::bool_switch()->default_value(false), "For each flag show one explanatory line from the man page") // TO DO
 
-        ("help,h", po::bool_switch()->default_value(false), "Show this help message")
+        ("help,h", po::bool_switch()->default_value(false), 
+         "Show this help message")
 
-        ("long,l", po::bool_switch()->default_value(false), "Show long flag notation, e.g. --help")
+        ("long,l", po::bool_switch()->default_value(false), 
+         "Show long flag notation, e.g. --help")
 
-        ("mixed,m", po::bool_switch()->default_value(false), "Show mixed flag notation, e.g. -h|--help")
+        ("mixed,m", po::bool_switch()->default_value(false), 
+         "Show mixed flag notation, e.g. -h|--help")
 
-        ("mixed-only,M", po::bool_switch()->default_value(false), "Show only flags that have both short and long notations")
+        ("mixed-only,M", po::bool_switch()->default_value(false), 
+         "Show only flags that have both short and long notations")
 
-        ("no-argument,n", po::bool_switch()->default_value(false), "Don't include the flag arguments")
+        ("no-argument,n", po::bool_switch()->default_value(false), 
+         "Don't include flag arguments")
 
-        ("pretty,p", po::bool_switch()->default_value(false), "Alias for '--color=always --enclose=[]'")
+        ("pretty,p", po::bool_switch()->default_value(false), 
+         "Alias for '--color=always --enclose=[]'")
 
-        ("reverse,r", po::bool_switch()->default_value(false), "Reverse the order of the output")
+        ("reverse,r", po::bool_switch()->default_value(false), 
+         "Reverse order of the output")
 
-        ("short,s", po::bool_switch()->default_value(false), "Show short flag notation, e.g. -h")
+        ("short,s", po::bool_switch()->default_value(false), 
+         "Show short flag notation, e.g. -h")
 
-        ("sort,S", po::bool_switch()->default_value(false), "Sort the output lexicographically (by default the flags are sorted by the order of appearance)")
+        ("sort,S", po::bool_switch()->default_value(false), 
+         "Sort the output lexicographically (default by appearance)")
 
-        ("title,t", po::bool_switch()->default_value(false), "Show a sentence from the man page NAME section")
+        ("title,t", po::bool_switch()->default_value(false), 
+         "Show a line from the man page NAME section")
 
-        ("version,v", po::bool_switch()->default_value(false), "Display version information and exit")
+        ("version,v", po::bool_switch()->default_value(false), 
+         "Display version information and exit")
 
-        ("flag-count,w", po::bool_switch()->default_value(false), "Show the flag count")
+        ("flag-count,w", po::bool_switch()->default_value(false), 
+         "Show flag count")
     ;
 
     try {
@@ -663,13 +720,13 @@ int set_program_options(int end, char ** av) {
 				return ExitCode::Version;
 			}
 			else if (it->string_key == "help") {
-				cout << desc << endl;
+                print_help(desc);
 				return ExitCode::Help;
 			}
 		}
 
 		if (!VM.count("input")) {
-			cout << desc << endl;
+            print_help(desc);
 			return ExitCode::Help;
 		}
 

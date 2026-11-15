@@ -1802,7 +1802,7 @@ BOOST_AUTO_TEST_CASE(fzf) {
         " ", " ", " ", " ",
         " ", " ", " ", " ",
         " ", " ", " ", " ",
-        " ", "-2"               // This flag shouldn't be here but is ambigous
+        " ", "-2"               // This flag shouldn't be here but is ambigous ???
     };
     vector<string> expected_long = {
         "--extended", "--exact", "--ignore-case", "--smart-case",
