@@ -459,7 +459,7 @@ BOOST_AUTO_TEST_CASE(set_man_page_ls) {
 }
 
 BOOST_AUTO_TEST_SUITE(coreutils) // (coreutils 9.12)
-// ls
+// ls(1)
 BOOST_AUTO_TEST_CASE(ls) {
     vector<string> expected_short = {
         "-a", "-A", " ", "-b",
@@ -500,7 +500,7 @@ BOOST_AUTO_TEST_CASE(ls) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// id
+// id(1)
 BOOST_AUTO_TEST_CASE(id) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -518,7 +518,7 @@ BOOST_AUTO_TEST_CASE(id) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// wc
+// wc(1)
 BOOST_AUTO_TEST_CASE(wc) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -536,7 +536,7 @@ BOOST_AUTO_TEST_CASE(wc) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// head
+// head(1)
 BOOST_AUTO_TEST_CASE(head) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -552,7 +552,7 @@ BOOST_AUTO_TEST_CASE(head) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// tail
+// tail(1)
 BOOST_AUTO_TEST_CASE(tail) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -572,7 +572,7 @@ BOOST_AUTO_TEST_CASE(tail) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// date 
+// date(1)
 BOOST_AUTO_TEST_CASE(date) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -590,7 +590,7 @@ BOOST_AUTO_TEST_CASE(date) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// od 
+// od(1)
 BOOST_AUTO_TEST_CASE(od) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -614,7 +614,7 @@ BOOST_AUTO_TEST_CASE(od) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// test
+// test(1)
 BOOST_AUTO_TEST_CASE(test) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -638,7 +638,7 @@ BOOST_AUTO_TEST_CASE(test) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// echo
+// echo(1)
 BOOST_AUTO_TEST_CASE(echo) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -657,7 +657,7 @@ BOOST_AUTO_TEST_SUITE_END()
 
 
 BOOST_AUTO_TEST_SUITE(base)
-// bzip2 (1.0.8)
+// bzip2(1) (1.0.8)
 BOOST_AUTO_TEST_CASE(bzip2) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -677,7 +677,7 @@ BOOST_AUTO_TEST_CASE(bzip2) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// grep (3.12-modified)
+// grep(1) (3.12-modified)
 BOOST_AUTO_TEST_CASE(grep) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -713,7 +713,7 @@ BOOST_AUTO_TEST_CASE(grep) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// file (5.48)
+// file(1) (5.48)
 BOOST_AUTO_TEST_CASE(file) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -757,7 +757,7 @@ BOOST_AUTO_TEST_CASE(file) {
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(network)
-// ifconfig (net-tools 2.10)
+// ifconfig(8) (net-tools 2.10)
 BOOST_AUTO_TEST_CASE(ifconfig) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -771,7 +771,7 @@ BOOST_AUTO_TEST_CASE(ifconfig) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// arp (net-tools 2.10)
+// arp(8) (net-tools 2.10)
 BOOST_AUTO_TEST_CASE(arp) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -787,7 +787,7 @@ BOOST_AUTO_TEST_CASE(arp) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// tcpdump (4.99.7)
+// tcpdump(1) (4.99.7)
 BOOST_AUTO_TEST_CASE(tcpdump) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -831,7 +831,7 @@ BOOST_AUTO_TEST_CASE(tcpdump) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// ping (iputils 20250605)
+// ping(8) (iputils 20250605)
 BOOST_AUTO_TEST_CASE(ping) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -863,7 +863,7 @@ BOOST_AUTO_TEST_CASE(ping) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// traceroute (2.1.6)
+// traceroute(8) (2.1.6)
 BOOST_AUTO_TEST_CASE(traceroute) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -893,7 +893,7 @@ BOOST_AUTO_TEST_CASE(traceroute) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// netstat (net-tools 2.10)
+// netstat(8) (net-tools 2.10)
 BOOST_AUTO_TEST_CASE(netstat) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -915,7 +915,7 @@ BOOST_AUTO_TEST_CASE(netstat) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// nc (1.101)
+// nc(1) (1.101)
 BOOST_AUTO_TEST_CASE(nc) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -947,7 +947,7 @@ BOOST_AUTO_TEST_CASE(nc) {
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(git)
-// git (2.56.0)
+// git(1) (2.56.0)
 BOOST_AUTO_TEST_CASE(git) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -973,7 +973,7 @@ BOOST_AUTO_TEST_CASE(git) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git add
+// git-add(1)
 BOOST_AUTO_TEST_CASE(git_add) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -997,7 +997,7 @@ BOOST_AUTO_TEST_CASE(git_add) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git bisect
+// git-bisect(1)
 BOOST_AUTO_TEST_CASE(git_bisect) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1011,7 +1011,7 @@ BOOST_AUTO_TEST_CASE(git_bisect) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git branch 
+// git-branch(1)
 BOOST_AUTO_TEST_CASE(git_branch) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1043,7 +1043,7 @@ BOOST_AUTO_TEST_CASE(git_branch) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git checkout 
+// git-checkout(1)
 BOOST_AUTO_TEST_CASE(git_checkout) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1067,7 +1067,7 @@ BOOST_AUTO_TEST_CASE(git_checkout) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git clean 
+// git-clean(1)
 BOOST_AUTO_TEST_CASE(git_clean) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1083,7 +1083,7 @@ BOOST_AUTO_TEST_CASE(git_clean) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git commit
+// git-commit(1)
 BOOST_AUTO_TEST_CASE(git_commit) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1115,7 +1115,7 @@ BOOST_AUTO_TEST_CASE(git_commit) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git fetch
+// git-fetch(1)
 BOOST_AUTO_TEST_CASE(git_fetch) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1151,7 +1151,7 @@ BOOST_AUTO_TEST_CASE(git_fetch) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git init 
+// git-init(1)
 BOOST_AUTO_TEST_CASE(git_init) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1167,7 +1167,7 @@ BOOST_AUTO_TEST_CASE(git_init) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git merge 
+// git-merge(1)
 BOOST_AUTO_TEST_CASE(git_merge) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1193,7 +1193,7 @@ BOOST_AUTO_TEST_CASE(git_merge) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git pull
+// git-pull(1)
 BOOST_AUTO_TEST_CASE(git_pull) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1233,7 +1233,7 @@ BOOST_AUTO_TEST_CASE(git_pull) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git push
+// git-push(1)
 BOOST_AUTO_TEST_CASE(git_push) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1259,7 +1259,7 @@ BOOST_AUTO_TEST_CASE(git_push) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git rebase 
+// git-rebase(1)
 BOOST_AUTO_TEST_CASE(git_rebase) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1293,7 +1293,7 @@ BOOST_AUTO_TEST_CASE(git_rebase) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// git tag
+// git-tag(1)
 BOOST_AUTO_TEST_CASE(git_tag) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1322,7 +1322,7 @@ BOOST_AUTO_TEST_CASE(git_tag) {
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(docker)
-// docker (29.9.2)
+// docker(1) (29.9.2)
 BOOST_AUTO_TEST_CASE(docker) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1340,7 +1340,7 @@ BOOST_AUTO_TEST_CASE(docker) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// docker commit
+// docker-commit(1)
 BOOST_AUTO_TEST_CASE(docker_commit) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1354,7 +1354,7 @@ BOOST_AUTO_TEST_CASE(docker_commit) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// docker create
+// docker-create(1)
 BOOST_AUTO_TEST_CASE(docker_create) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1416,7 +1416,7 @@ BOOST_AUTO_TEST_CASE(docker_create) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// docker logs
+// docker-logs(1)
 BOOST_AUTO_TEST_CASE(docker_logs) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1432,7 +1432,7 @@ BOOST_AUTO_TEST_CASE(docker_logs) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// docker stats
+// docker-stats(1)
 BOOST_AUTO_TEST_CASE(docker_stats) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1446,7 +1446,7 @@ BOOST_AUTO_TEST_CASE(docker_stats) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// docker update
+// docker-update(1)
 BOOST_AUTO_TEST_CASE(docker_update) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1468,7 +1468,7 @@ BOOST_AUTO_TEST_CASE(docker_update) {
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(other)
-// ssh (OpenSSH_10.6p1)
+// ssh(1) (OpenSSH_10.6p1)
 BOOST_AUTO_TEST_CASE(ssh) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1508,7 +1508,7 @@ BOOST_AUTO_TEST_CASE(ssh) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// scp (OpenSSL 3.6.5)
+// scp(1) (OpenSSL 3.6.5)
 BOOST_AUTO_TEST_CASE(scp) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1532,7 +1532,7 @@ BOOST_AUTO_TEST_CASE(scp) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// vim (9.2)
+// vim(1) (9.2)
 BOOST_AUTO_TEST_CASE(vim) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1584,7 +1584,7 @@ BOOST_AUTO_TEST_CASE(vim) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// nvim (v0.12.6)
+// nvim(1) (v0.12.6)
 BOOST_AUTO_TEST_CASE(nvim) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1616,7 +1616,7 @@ BOOST_AUTO_TEST_CASE(nvim) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// kitty (0.49.2)
+// kitty(1) (0.49.2)
 BOOST_AUTO_TEST_CASE(kitty) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1642,7 +1642,7 @@ BOOST_AUTO_TEST_CASE(kitty) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// tmux (3.8)
+// tmux(1) (3.8)
 BOOST_AUTO_TEST_CASE(tmux) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1662,7 +1662,7 @@ BOOST_AUTO_TEST_CASE(tmux) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// jq (1.8.2)
+// jq(1) (1.8.2)
 BOOST_AUTO_TEST_CASE(jq) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1690,7 +1690,7 @@ BOOST_AUTO_TEST_CASE(jq) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// sed (4.10)
+// sed(1) (4.10)
 BOOST_AUTO_TEST_CASE(sed) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1710,7 +1710,7 @@ BOOST_AUTO_TEST_CASE(sed) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// zip (v3.0)
+// zip(1) (v3.0)
 BOOST_AUTO_TEST_CASE(zip) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1768,7 +1768,7 @@ BOOST_AUTO_TEST_CASE(zip) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// fzf (0.74.5)
+// fzf(1) (0.74.5)
 BOOST_AUTO_TEST_CASE(fzf) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",
@@ -1842,7 +1842,7 @@ BOOST_AUTO_TEST_CASE(fzf) {
     test_command(command, title, expected_short, expected_long);
 }
 
-// rg (15.2.0)
+// rg(1) (15.2.0)
 BOOST_AUTO_TEST_CASE(rg) {
     vector<string> expected_short = {
         // " ", " ", " ", " ",

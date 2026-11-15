@@ -2,7 +2,7 @@ CXX      := clang++
 CXXFLAGS := -std=c++17 -Wall -Wextra -Wunused -g1 -O0 -Isrc
 LDFLAGS  := -lboost_program_options
 
-.PHONY: all clean
+.PHONY: flag clean
 
 all: flag flag_test
 
