@@ -388,8 +388,9 @@ BOOST_AUTO_TEST_CASE(reverse) {
     set_options(command2);
     auto reversed = get_command_flags(command2, man_page);
 
-    for (size_t i = 0; i < regular.size(); i++)
+    for (size_t i = 0; i < regular.size(); i++) {
         BOOST_TEST(regular[i] == reversed[regular.size() - i - 1]);
+    }
 
 	reset_globals();
 }
