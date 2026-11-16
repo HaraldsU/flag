@@ -21,7 +21,7 @@ flag_test: test/flag_test.o src/flag.o
 install: flag
 	install -Dm755 flag "$(DESTDIR)$(BINDIR)/flag"
 	install -Dm644 LICENSE -t "$(DESTDIR)$(LICENSEDIR)/"
-	install -Dm644 flag.1 -t "$(DESTDIR)$(MANDIR)/man1/"
+	install -Dm644 man/flag.1 -t "$(DESTDIR)$(MANDIR)/man1/"
 
 clean:
 	rm -f src/*.o test/*.o flag flag_test
