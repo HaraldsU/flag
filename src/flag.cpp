@@ -268,7 +268,8 @@ void print_help(const po::options_description desc) {
 int sort_flags(vector<string> & flags) {
     try {
         sort(flags.begin(), flags.end(), ilexic());
-    } catch (const exception & e) {
+    } 
+    catch (const exception & e) {
         throw e.what();
     }
 
@@ -278,7 +279,8 @@ int sort_flags(vector<string> & flags) {
 int reverse_flags(vector<string> & flags) {
     try {
         reverse(flags.begin(), flags.end());
-    } catch (const exception & e) {
+    } 
+    catch (const exception & e) {
         throw e.what();
     }
     
@@ -444,7 +446,8 @@ void add_flags(vector<string> & flags, string man_page, string regx) {
     if (IS_SORT) {
         try {
             sort_flags(flags);
-        } catch (const string & em) {
+        } 
+        catch (const string & em) {
             throw em;
         }
     }
@@ -452,7 +455,8 @@ void add_flags(vector<string> & flags, string man_page, string regx) {
     if (IS_REVERSE) {
         try {
             reverse_flags(flags);
-        } catch (const string & em) {
+        } 
+        catch (const string & em) {
             throw em;
         }
     }
@@ -628,7 +632,8 @@ void get_flags(vector<string> & commands, string man_page) {
     try {
         add_flags(commands, man_page, reg_final);
         if (commands.size() == 0) throw string{"no flags found (try flag -m)"};
-    } catch (const string & e) { throw e; }
+    } 
+    catch (const string & e) { throw e; }
 }
 
 
@@ -778,7 +783,8 @@ int set_program_options(int end, char ** av) {
             VM.at("enclose").value() = string("[]");
             VM.at("color").value() = string("always");
         }
-    } catch (const po::error & e) {
+    } 
+    catch (const po::error & e) {
         throw string{e.what()};
     }
 
@@ -792,11 +798,15 @@ string set_man_page() {
     string man_page {};
 
     auto po = popen(command.c_str(), "r");
+    if (!po) throw runtime_error{"failed to run man"};
+
     char buf[1024];
     while (fgets(buf, 1024, po)) man_page.append(buf);
-    pclose(po);
 
-    if (man_page.size() == 0) throw string{"man page for command '" + input + "' not found"};
+    int status = pclose(po);
+    if (status == -1 or !WIFEXITED(status) or WEXITSTATUS(status) != 0 or man_page.empty()) {
+        throw runtime_error{"man page for command '" + input + "' not found"};
+    }
 
     return man_page;
 }

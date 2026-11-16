@@ -17,7 +17,7 @@ flag - fast discovery of command flags from man pages
 # DESCRIPTION
 
 flag is a command-line tool for fast discovery of command flags from man pages. ++
-flag relies on the man(1) and cat(1) commands for it's functionality, ++
+flag relies on the man(1) and cat(1) commands for parts of it's functionality, ++
 effectively executing "*man [*_arguments_*] 2>/dev/null | cat*" to get the man ++
 page for the specified command and then matching it against a regular expression ++
 (regex). ++
