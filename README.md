@@ -20,6 +20,7 @@ Because flag uses regex for it's functionality, there are some known
 - clang++ with C++17 support
 - Boost.Program_options
 
+## Makefile
 ```make
 # Same as make flag
 make
