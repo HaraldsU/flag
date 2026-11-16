@@ -798,14 +798,14 @@ string set_man_page() {
     string man_page {};
 
     auto po = popen(command.c_str(), "r");
-    if (!po) throw runtime_error{"failed to run man"};
+    if (!po) throw string{"failed to run man"};
 
     char buf[1024];
     while (fgets(buf, 1024, po)) man_page.append(buf);
 
     int status = pclose(po);
     if (status == -1 or !WIFEXITED(status) or WEXITSTATUS(status) != 0 or man_page.empty()) {
-        throw runtime_error{"man page for command '" + input + "' not found"};
+        throw string{"man page for command '" + input + "' not found"};
     }
 
     return man_page;
