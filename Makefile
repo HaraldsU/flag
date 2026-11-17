@@ -1,12 +1,11 @@
 CXXFLAGS   += -std=c++17 -Wall -Wextra -Wunused -O2 -Isrc
 LDFLAGS    += -lboost_program_options
 
-PREFIX     ?= /usr/local
+PREFIX     ?= /usr
 BINDIR     ?= $(PREFIX)/bin
 DATADIR    ?= $(PREFIX)/share
 MANDIR     ?= $(DATADIR)/man
 LICENSEDIR ?= $(DATADIR)/licenses/flag
-
 
 .PHONY: all clean install
 

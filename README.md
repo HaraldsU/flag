@@ -12,27 +12,21 @@ page for the specified command and then matches it against a regular expression 
 Because flag uses regex for it's functionality, there are some known 
 [limitations](#LIMITATIONS).
 
-# Installing
-???
-
 # Building
-## Prerequisites
-- clang++ with C++17 support
-- Boost.Program_options
+## Dependencies 
+depends=('libstdc++' 'libgcc' 'glibc' 'boost-libs')
+makedepends=('boost')
 
 ## Makefile
 ```make
-# Same as make flag
-make
+# Builds and installs flag
+make install
 
 # Builds the flag binary
 make flag
 
 # Builds the testing binary
 make flag_test
-
-# Builds flag and flag_test
-make all
 ```
 
 # Known limitations
