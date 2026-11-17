@@ -1,7 +1,7 @@
 CXXFLAGS   += -std=c++17 -Wall -Wextra -Wunused -O2 -Isrc
 LDFLAGS    += -lboost_program_options
 
-PREFIX     ?= /usr
+PREFIX     ?= /usr/local
 BINDIR     ?= $(PREFIX)/bin
 DATADIR    ?= $(PREFIX)/share
 MANDIR     ?= $(DATADIR)/man

@@ -13,6 +13,8 @@ Because flag uses regex for it's functionality, there are some known
 [limitations](#LIMITATIONS).
 
 # Building
+Download the latest tar ball from [releases](https://github.com/HaraldsU/flag/releases)
+
 ## Dependencies 
 depends=('libstdc++' 'libgcc' 'glibc' 'boost-libs')<br>
 makedepends=('boost')
@@ -20,10 +22,10 @@ makedepends=('boost')
 ## Makefile
 ```make
 # Builds and installs flag
-make install
+sudo make install
 
 # Uninstalls related files
-make uninstall
+sudo make uninstall
 
 # Builds the flag binary
 make flag

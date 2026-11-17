@@ -354,10 +354,9 @@ BOOST_AUTO_TEST_CASE(no_argument) {
             "-i", "-l", "-o", "-s",
             "-x" 
         };
-        string command = "flag -ns od";
-        set_options(command);
-
         try {
+            string command = "flag -ns od";
+            set_options(command);
             auto man_page = set_man_page();
             auto act = get_command_flags(command, man_page);
 
@@ -366,9 +365,8 @@ BOOST_AUTO_TEST_CASE(no_argument) {
         catch (const string & em) {
             BOOST_CHECK_THROW(set_man_page(), string);
         }
-
-        reset_globals();
     }
+    reset_globals();
 
     {
         vector<string> exp_l_od = {
@@ -377,10 +375,10 @@ BOOST_AUTO_TEST_CASE(no_argument) {
             "--strings", "--format", "--output-duplicates", "--width",
             "--traditional", "--help", "--version"  
         };
-        string command = "flag -nl od";
-        set_options(command);
 
         try {
+            string command = "flag -nl od";
+            set_options(command);
             auto man_page = set_man_page();
             auto act = get_command_flags(command, man_page);
 
@@ -389,9 +387,8 @@ BOOST_AUTO_TEST_CASE(no_argument) {
         catch (const string & em) {
             BOOST_CHECK_THROW(set_man_page(), string);
         }
-
-        reset_globals();
     }
+    reset_globals();
 }
 
 // Test the --[p]retty flag
