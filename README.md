@@ -14,13 +14,16 @@ Because flag uses regex for it's functionality, there are some known
 
 # Building
 ## Dependencies 
-depends=('libstdc++' 'libgcc' 'glibc' 'boost-libs')
+depends=('libstdc++' 'libgcc' 'glibc' 'boost-libs')<br>
 makedepends=('boost')
 
 ## Makefile
 ```make
 # Builds and installs flag
 make install
+
+# Uninstalls related files
+make uninstall
 
 # Builds the flag binary
 make flag

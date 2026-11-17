@@ -7,7 +7,7 @@ DATADIR    ?= $(PREFIX)/share
 MANDIR     ?= $(DATADIR)/man
 LICENSEDIR ?= $(DATADIR)/licenses/flag
 
-.PHONY: all clean install
+.PHONY: all clean install uninstall
 
 all: flag flag_test
 
@@ -21,6 +21,12 @@ install: flag
 	install -Dm755 flag "$(DESTDIR)$(BINDIR)/flag"
 	install -Dm644 LICENSE -t "$(DESTDIR)$(LICENSEDIR)/"
 	install -Dm644 man/flag.1 -t "$(DESTDIR)$(MANDIR)/man1/"
+
+uninstall:
+	rm -f "$(DESTDIR)$(BINDIR)/flag"
+	rm -f "$(DESTDIR)$(LICENSEDIR)/LICENSE"
+	rm -f "$(DESTDIR)$(MANDIR)/man1/flag.1"
+	-rmdir "$(DESTDIR)$(LICENSEDIR)"
 
 clean:
 	rm -f src/*.o test/*.o flag flag_test
