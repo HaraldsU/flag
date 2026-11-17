@@ -218,7 +218,7 @@ BOOST_AUTO_TEST_CASE(color) {
 
 // Test the --[c]olumn flag
 BOOST_AUTO_TEST_CASE(column) {
-    string command1 {"flag --column 1 --delimiter '" + DELIMITER + "' ls"};
+    string command1 {"--column 1 --delimiter '" + DELIMITER + "' ls"};
     set_options(command1);
 
     try {
@@ -262,7 +262,7 @@ BOOST_AUTO_TEST_CASE(delimiter) {
 
     for (auto & [del, out] : cases) {
         DELIMITER = del;
-        string command {"flag --delimiter '" + DELIMITER + "' pwd"};
+        string command {"--delimiter '" + DELIMITER + "' pwd"};
         set_options(command);
 
         try {
@@ -292,7 +292,7 @@ BOOST_AUTO_TEST_CASE(delimiter) {
 
 // Test the -D|--debug flag
 BOOST_AUTO_TEST_CASE(debug) {
-    string command = "flag --debug ls";
+    string command = "--debug ls";
     int rc;
     string out;
     {
@@ -301,7 +301,7 @@ BOOST_AUTO_TEST_CASE(debug) {
         out = capture.str();
     }
     BOOST_TEST(!VM["debug"].defaulted());
-    BOOST_TEST(rc == 0);
+    BOOST_TEST(rc == ExitCode::Success);
     reset_globals();
 }
 
@@ -329,7 +329,7 @@ BOOST_AUTO_TEST_CASE(enclose) {
 
 // Test the --[h]elp flag
 BOOST_AUTO_TEST_CASE(help) {
-    string command = "flag --help";
+    string command = "--help";
     int rc;
     string out;
     {
@@ -355,7 +355,7 @@ BOOST_AUTO_TEST_CASE(no_argument) {
             "-x" 
         };
         try {
-            string command = "flag -ns od";
+            string command = "-ns od";
             set_options(command);
             auto man_page = set_man_page();
             auto act = get_command_flags(command, man_page);
@@ -377,7 +377,7 @@ BOOST_AUTO_TEST_CASE(no_argument) {
         };
 
         try {
-            string command = "flag -nl od";
+            string command = "-nl od";
             set_options(command);
             auto man_page = set_man_page();
             auto act = get_command_flags(command, man_page);
@@ -393,7 +393,7 @@ BOOST_AUTO_TEST_CASE(no_argument) {
 
 // Test the --[p]retty flag
 BOOST_AUTO_TEST_CASE(pretty) {
-    string command = "flag --pretty ls";
+    string command = "--pretty ls";
     set_options(command);
 
     BOOST_TEST(IS_PRETTY == true);
@@ -407,14 +407,14 @@ BOOST_AUTO_TEST_CASE(pretty) {
 
 // Test the --[r]everse flag
 BOOST_AUTO_TEST_CASE(reverse) {
-    string command1 = "flag wc";
+    string command1 = "wc";
     set_options(command1);
 
     try {
         auto man_page = set_man_page();
         auto regular = get_command_flags(command1, man_page);
 
-        string command2 = "flag -r wc";
+        string command2 = "-r wc";
         set_options(command2);
         auto reversed = get_command_flags(command2, man_page);
 
@@ -437,7 +437,7 @@ BOOST_AUTO_TEST_CASE(sort) {
          "--version", "-w,--words"
     };
 
-    string command = "flag -S wc";
+    string command = "-S wc";
     set_options(command);
 
     try {
@@ -455,7 +455,7 @@ BOOST_AUTO_TEST_CASE(sort) {
 
 // Test the --[v]ersion flag
 BOOST_AUTO_TEST_CASE(version) {
-    string command = "flag --version";
+    string command = "--version";
     int rc;
     string out;
     {
@@ -489,12 +489,15 @@ BOOST_AUTO_TEST_CASE(string_to_argc_argv) {
 }
 
 BOOST_AUTO_TEST_CASE(set_man_page_ls) {
-    string command = "flag ls";
-    Input input(command.c_str());
+    string command = "ls";
+    int rc;
+    string out;
     {
         CaptureCout capture;
-        set_program_options(input.ac, input.av);
+        rc = set_options(command);
+        out = capture.str();
     }
+    BOOST_TEST(rc == ExitCode::Success);
 
     try {
         auto man_page = set_man_page();

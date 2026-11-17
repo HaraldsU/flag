@@ -716,6 +716,7 @@ int set_program_options(int end, char ** av) {
             .options(all)
             .positional(pos)
             .run();
+
         po::store(parsed, VM);
         po::notify(VM); 
 

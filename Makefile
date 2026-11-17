@@ -22,7 +22,7 @@ install: flag
 	install -Dm644 LICENSE -t "$(DESTDIR)$(LICENSEDIR)/"
 	install -Dm644 man/flag.1 -t "$(DESTDIR)$(MANDIR)/man1/"
 
-uninstall:
+uninstall: clean
 	rm -f "$(DESTDIR)$(BINDIR)/flag"
 	rm -f "$(DESTDIR)$(LICENSEDIR)/LICENSE"
 	rm -f "$(DESTDIR)$(MANDIR)/man1/flag.1"
