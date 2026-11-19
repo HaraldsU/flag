@@ -12,7 +12,7 @@
 using namespace std;
 namespace po = boost::program_options;
 
-struct ilexic {
+struct Lexic {
     // Strip the dashes at the start to start comparing with alnum
     string strip_start(const string & s) {
         auto it = find_if(s.begin(), s.end(), [](unsigned char c) { return isalnum(c); });
@@ -118,7 +118,7 @@ int debug_print() {
 
 void debug_print_sub_matches(boost::smatch sm) {
     for (size_t i = 0; i < sm.size(); i++) {
-        if (sm[i].matched) cout << "s[" << i << "]: " << sm[i] << endl;
+        if (sm[i].matched) cout << "s[" << i << "]: " << "\"" << sm[i] << "\"" << endl;
     }
 }
 
@@ -267,7 +267,7 @@ void print_help(const po::options_description desc) {
 
 int sort_flags(vector<string> & flags) {
     try {
-        sort(flags.begin(), flags.end(), ilexic());
+        sort(flags.begin(), flags.end(), Lexic());
     } 
     catch (const exception & e) {
         throw e.what();
@@ -287,57 +287,76 @@ int reverse_flags(vector<string> & flags) {
     return 0;
 }
 
-int add_flags_mixed(vector<string> & flags, boost::smatch sm) {
+struct CaptureGroupCount {
+    int reg_short      = 0;
+    int reg_long       = 0;
+    int reg_sep        = 0;
+    int reg_short_long = 0;
+    int reg_long_short = 0;
+};
+
+int add_flags_mixed(vector<string> & flags, boost::smatch sm, CaptureGroupCount cgc) {
     string command {};
     vector<string> captured_flags {};
     Mode mode {};
 
-    if (sm[2].matched) {
-        if (IS_DEBUG) cout << "SL" << endl;
-        captured_flags.push_back(sm[3]);
-        captured_flags.push_back(sm[10]);
+    // reg_final = reg_start + "(?:" + reg_sl + "|" + reg_ls + "|" + reg_long + "|" + reg_short + ")" + reg_end ;
+    int short_long = 1;
+    int short_long_short = short_long + 1;
+    int short_long_long = short_long_short + cgc.reg_short + cgc.reg_sep;
+
+    int long_short = short_long + cgc.reg_short_long;
+    int long_short_long = long_short + 1;
+    int long_short_short = long_short_long + cgc.reg_long + cgc.reg_sep;
+
+    int lng = long_short + cgc.reg_long_short;
+    int shrt = lng + cgc.reg_long;
+
+    if (sm[short_long].matched) {
+        if (IS_DEBUG) cout << "SL" << endl << endl;
+
+        captured_flags.push_back(sm[short_long_short]);
+        captured_flags.push_back(sm[short_long_long]);
         FLAG_COUNT[Mode::Mixed]++;
         mode = Mode::Mixed;
 
-        if (!IS_NO_ARGUMENT) command = sm[3] + "," + sm[10];
-        else command = sm[4] + "," + sm[11];
+        if (!IS_NO_ARGUMENT) command = sm[short_long_short] + "," + sm[short_long_long];
+        else command = sm[short_long_short + 1] + "," + sm[short_long_long + 1];
     }
-    else if (sm[13].matched) {
-        if (IS_DEBUG) cout << "LS" << endl;
-        captured_flags.push_back(sm[14]);
-        captured_flags.push_back(sm[21]);
+    else if (sm[long_short].matched) {
+        if (IS_DEBUG) cout << "LS" << endl << endl;
+
+        captured_flags.push_back(sm[long_short_short]);
+        captured_flags.push_back(sm[long_short_long]);
         FLAG_COUNT[Mode::Mixed]++;
         mode = Mode::Mixed;
 
-        if (!IS_NO_ARGUMENT) command = sm[21] + "," + sm[14];
-        else command = sm[22] + "," + sm[15];
+        if (!IS_NO_ARGUMENT) command = sm[long_short_short] + "," + sm[long_short_long];
+        else command = sm[long_short_short + 1] + "," + sm[long_short_long + 1];
     }
     else if (!IS_MIXED_ONLY) {
-        if (sm[24].matched) {
-            if (IS_DEBUG) cout << "SHORT" << endl;
+        if (sm[lng].matched) {
+            if (IS_DEBUG) cout << "LONG" << endl << endl;
+
+            FLAG_COUNT[Mode::Long]++;
+            mode = Mode::Long;
+            captured_flags.push_back(sm[lng + 1]);
+
+            if (!IS_NO_ARGUMENT) command = sm[lng];
+            else command = sm[lng + 1];
+        }
+        else if (sm[shrt].matched) {
+            if (IS_DEBUG) cout << "SHORT" << endl << endl;
+
             FLAG_COUNT[Mode::Short]++;
             mode = Mode::Short;
 
-            if (!IS_NO_ARGUMENT) { 
-                command = sm[24];
-                captured_flags.push_back(sm[24]);
-            }
-            else { 
-                command = sm[25];
-                captured_flags.push_back(sm[25]);
-            }
-        }
-        else if (sm[27].matched) {
-            if (IS_DEBUG) cout << "LONG" << endl;
-            FLAG_COUNT[Mode::Long]++;
-            mode = Mode::Long;
-            captured_flags.push_back(sm[28]);
-
-            if (!IS_NO_ARGUMENT) command = sm[27];
-            else command = sm[28];
+            if (!IS_NO_ARGUMENT) command = sm[shrt];
+            else command = sm[shrt + 1];
+            captured_flags.push_back(sm[shrt]);
         }
         else {
-            if (IS_DEBUG) cout << "NO MATCH" << endl;
+            if (IS_DEBUG) cout << "NO MATCH" << endl << endl;
             return 1;
         }
     }
@@ -363,55 +382,42 @@ int add_flags_mixed(vector<string> & flags, boost::smatch sm) {
     return 0;
 }
 
-int add_flags_short_long(vector<string> & flags, boost::smatch sm) {
+int add_flags_long(vector<string> & flags, boost::smatch sm, CaptureGroupCount cgc) {
     string command {};
     string flag {};
     Mode mode {};
+    int idx = 0;
 
-    if (MODE == Mode::Short) { 
-        if (sm[8].matched) {
-            if (IS_DEBUG) cout << "LS" << endl;
-            flag = sm[8];
+    // reg_final = reg_start + "(?:" + reg_sl + "|" + reg_ls + "|" + reg_long + "|" + reg_short + ")" + reg_end ;
+    int short_long_long = 1 + 1 + cgc.reg_short + cgc.reg_sep;
+    int long_short_short = 1 + short_long_long + cgc.reg_long;
+    int lng = long_short_short + cgc.reg_long_short - 1;
 
-            if (!IS_NO_ARGUMENT) command = sm[8];
-            else command = sm[9];
-        }
-        else if (sm[11].matched) {
-            if (IS_DEBUG) cout << "SHORT OR SL" << endl;
-            flag = sm[11];
-
-            if (!IS_NO_ARGUMENT) command = sm[11];
-            else command = sm[12];
-        }
-        else { 
-            if (IS_DEBUG) cout << "NO MATCH" << endl;
-            return 1;
-        }
-        FLAG_COUNT[Mode::Short]++;
-        mode = Mode::Short;
+    if (sm[short_long_long].matched) {
+        if (IS_DEBUG) cout << "SLL" << endl << endl;
+        idx = short_long_long;
     }
-    else if (MODE == Mode::Long) {
-        if (sm[8].matched) {
-            if (IS_DEBUG) cout << "SL" << endl;
-            flag = sm[8];   // Make --indicator-style=WORD and -p, --indicator-style=slash work (ls)
+    else if (sm[long_short_short].matched) {
+        if (IS_DEBUG) cout << "LSL" << endl << endl;
+        idx = long_short_short;
+    }
+    else if (sm[lng].matched) {
+        if (IS_DEBUG) cout << "LONG" << endl << endl;
+        idx = lng;
+    }
+    else {
+        if (IS_DEBUG) cout << "NO MATCH" << endl << endl;
+        return 1;
+    }
 
-            if (!IS_NO_ARGUMENT) command = sm[8];
-            else command = sm[9];
-        }
-        else if (sm[11].matched) {
-            if (IS_DEBUG) cout << "LONG OR LS" << endl;
-            flag = sm[12];
+    if (sm[short_long_long].matched) flag = sm[idx];
+    else flag = sm[idx + 1];
 
-            if (!IS_NO_ARGUMENT) command = sm[11];
-            else command = sm[12];
-        }
-        else {
-            if (IS_DEBUG) cout << "NO MATCH" << endl;
-            return 1;
-        }
-        FLAG_COUNT[Mode::Long]++;
-        mode = Mode::Long;
-    } 
+    if (!IS_NO_ARGUMENT) command = sm[idx];
+    else command = sm[idx + 1];
+
+    FLAG_COUNT[Mode::Long]++;
+    mode = Mode::Long;
 
     bool found = find(FLAGS_ONLY.begin(), FLAGS_ONLY.end(), flag) != FLAGS_ONLY.end();
     if (!found) flags.push_back(command);
@@ -421,26 +427,70 @@ int add_flags_short_long(vector<string> & flags, boost::smatch sm) {
     return 0;
 }
 
-void add_flags(vector<string> & flags, string man_page, string regx) {
-    const boost::regex expr(regx, boost::regex::no_mod_s | boost::regex::mod_x);
+int add_flags_short(vector<string> & flags, boost::smatch sm, CaptureGroupCount cgc) {
+    string command {};
+    string flag {};
+    Mode mode {};
+    int idx = 0;
+
+    // reg_final = reg_start + "(?:" + reg_sl + "|" + reg_ls + "|" + reg_long + "|" + reg_short + ")" + reg_end ;
+    int short_long_short = 1 + 1;
+    int long_short_short = short_long_short + cgc.reg_short_long + cgc.reg_long + cgc.reg_sep;
+    int shrt = long_short_short + cgc.reg_short + cgc.reg_long;
+
+    if (sm[short_long_short].matched) {
+         if (IS_DEBUG) cout << "SLS" << endl << endl;
+         idx = short_long_short;
+    }
+    else if (sm[long_short_short].matched) {
+        if (IS_DEBUG) cout << "LSS" << endl << endl;
+        idx = long_short_short;
+    }
+    else if (sm[shrt].matched) {
+         if (IS_DEBUG) cout << "SHORT" << endl << endl;
+         idx = shrt;
+    }
+    else { 
+        if (IS_DEBUG) cout << "NO MATCH" << endl << endl;
+        return 1;
+    }
+
+    flag = sm[idx];
+    if (!IS_NO_ARGUMENT) command = sm[idx];
+    else command = sm[idx + 1];
+
+    FLAG_COUNT[Mode::Short]++;
+    mode = Mode::Short;
+
+    bool found = find(FLAGS_ONLY.begin(), FLAGS_ONLY.end(), flag) != FLAGS_ONLY.end();
+    if (!found) flags.push_back(command);
+    else FLAG_COUNT[mode]--;
+    FLAGS_ONLY.insert(flag);
+
+    return 0;
+}
+
+void add_flags(vector<string> & flags, string man_page, string regx, CaptureGroupCount cgc) {
+    const boost::regex expr(regx, boost::regex::mod_x);
     boost::sregex_iterator sr_iterator(man_page.begin(), man_page.end(), expr);
 
     for (auto mr = sr_iterator; mr != boost::sregex_iterator(); mr++) {
         auto sm = *mr;
-
         if (IS_DEBUG) debug_print_sub_matches(sm);
 
-        if (MODE == Mode::Short or MODE == Mode::Long) {
-            auto r = add_flags_short_long(flags, sm);
+        if (MODE == Mode::Short) {
+            auto r = add_flags_short(flags, sm, cgc);
+            if (r == 1) continue;
+        }
+        else if (MODE == Mode::Long) {
+            auto r = add_flags_long(flags, sm, cgc);
             if (r == 1) continue;
         }
         else if (MODE == Mode::Mixed) {
-            auto r = add_flags_mixed(flags, sm);
+            auto r = add_flags_mixed(flags, sm, cgc);
             if (r == 1) continue;
         } 
         else throw string{"invalid flag notation (expected short, long or mixed)"};
-
-        if (IS_DEBUG) cout << endl;
     }
 
     if (IS_SORT) {
@@ -474,6 +524,7 @@ void get_flags(vector<string> & commands, string man_page) {
     */
 
     string reg_final {};
+    CaptureGroupCount cgc {};
 
     // netstat has 3 spaces
     // +command, -c command (nvim)
@@ -490,21 +541,23 @@ void get_flags(vector<string> & commands, string man_page) {
     // E.g. -w max[,here,near] (traceroute)
     // E.g. -O output-file (zip)
     // E.g. -D [bind_address:]port (ssh)
-    // (1, 2?)
+    // (1, 2, 3>)
     string reg_short_helper {R"(
         (
-            (?:-[#!?@$.\w]+)
-            (?:-\w+)*
+            (
+                (?:-[#!?@$.\w]+)
+                (?:-\w+)*
+            )
+            (
+                (?:
+                    (?:[\[\]_=<>?{}]|[ ](?![ ]|--|and[ ]--))|
+                    ,(?![ \-])|
+                    -(?![\-])|
+                    :(?!\n)|
+                    \w
+                )+
+            )?
         )
-        (
-            (?:
-                (?:[\[\]_=<>?{}]|[ ](?![ ]|--|and[ ]--))|
-                ,(?![ \-])|
-                -(?![\-])|
-                :(?!\n)|
-                \w
-            )+
-        )?
     )"};
 
     string reg_short =
@@ -513,6 +566,8 @@ void get_flags(vector<string> & commands, string man_page) {
         R"((?<!-[#?\w]\n[ ]{4}))"
         R"((?<!-[#?\w]\n[ ]{5}))"
         R"((?<!-[#?\w]\n[ ]{6}))" + reg_short_helper;
+    int reg_short_cgc = boost::regex{reg_short, boost::regex::no_mod_s | boost::regex::mod_x}.mark_count();
+    cgc.reg_short = reg_short_cgc;
 
     // Start of the long flag (e.g. --all)
     // The flag name can contain a dash in the middle, e.g. --max-line-length (wc)
@@ -522,18 +577,22 @@ void get_flags(vector<string> & commands, string man_page) {
     // (1, 2?)
     string reg_long {R"(
         (
-            (?:--\w+)
-            (?:-\w+)*
-        ) 
-        (
-            (?:
-                [()\-\w\[\]{}|%+=<>?."~]|
-                [,:](?![ ]|\n)|
-                /(?![ ]-\w)|
-                [ ](?=\w|[\[\{\<\(])
-            )+
-        )?
+            (
+                (?:--\w+)
+                (?:-\w+)*
+            ) 
+            (
+                (?:
+                    [()\-\w\[\]{}|%+=<>?."~]|
+                    [,:](?![ ]|\n)|
+                    /(?![ ]-\w)|
+                    [ ](?=\w|[\[\{\<\(])
+                )+
+            )?
+        )
     )"};
+    int reg_long_cgc = boost::regex{reg_long, boost::regex::no_mod_s | boost::regex::mod_x}.mark_count();
+    cgc.reg_long = reg_long_cgc;
 
     string reg_sep {
         R"(
@@ -546,6 +605,8 @@ void get_flags(vector<string> & commands, string man_page) {
             R"(|)"
             R"(,[ ](?:)" + reg_long + R"(),[ ](?=-\w))"
         R"())"};
+    int reg_sep_cgc = boost::regex{reg_sep, boost::regex::no_mod_s | boost::regex::mod_x}.mark_count();
+    cgc.reg_sep = reg_sep_cgc;
 
     string reg_end {R"(
         (?=
@@ -560,80 +621,49 @@ void get_flags(vector<string> & commands, string man_page) {
         )
     )"};
 
-    // (1) + (rl) + (sep) + (rs) LONG-SHORT (want to capture SHORT)
-    string reg_sls =
-        "(?:" +
-            reg_long + reg_sep +
-        ")" +
-        "(" + reg_short + ")" // Actual capture
-    ;
-
-    // (1) + (rs) + (sep) + (rl) SHORT-LONG (want to capture LONG)
-    string reg_lsl =
-        "(?:" +
-            reg_short + reg_sep +
-        ")" +
-        "(" + reg_long + ")" // Actual capture
-    ;
-
-    // (1, 2, 3) + (rs) + (sep) + (rl) SHORT-LONG (want to capture BOTH)
-    string reg_sl = 
-        "((" + reg_short + ")" + // Capture
+    // e.g. -h, --help
+    string reg_sl =
+        "(" +
+            reg_short +
             reg_sep +
-            "(" + reg_long + ")" +  // Capture
+            reg_long +
         ")"
     ;
+    int reg_sl_cgc = boost::regex{reg_sl, boost::regex::no_mod_s | boost::regex::mod_x}.mark_count();
+    cgc.reg_short_long = reg_sl_cgc;
 
-    // (1, 2, 3) + (rl) + (sep) + (rs) LONG-SHORT (want to capture BOTH)
+    // e.g. --help, -h
     string reg_ls =
-        "((" + reg_long + ")" +  // Capture
+        "(" +
+            reg_long +
             reg_sep +
-            "(" + reg_short + ")" + // Capture
+            reg_short +
         ")"
     ;
+    int reg_ls_cgc = boost::regex{reg_ls, boost::regex::no_mod_s | boost::regex::mod_x}.mark_count();
+    cgc.reg_long_short = reg_ls_cgc;
 
-    if (MODE == Mode::Short) {
-        reg_final =                     // 0
-            reg_start +
-            "(" +                       // 1
-                reg_sls +               // 2, 3, 4, 5, 6, 7, 8 (full), 9 (flag), 10 (arg)
+    reg_final =
+        reg_start +
+        "(?:" +
+            reg_sl +
                 "|" +
-                "(" + reg_short + ")" + // 11 (full), 12 (flag), 13 (arg)
-            ")" +
-            reg_end
-        ;
-    } else if (MODE == Mode::Long) {
-        reg_final =                    // 0
-            reg_start +
-            "(" +                      // 1
-                reg_lsl +              // 2, 3, 4, 5, 6, 7, 8 (full), 9 (flag), 10 (arg)
+            reg_ls +
                 "|" +
-                "(" + reg_long + ")" + // 11 (full), 12 (flag), 13 (arg)
-            ")" +
-            reg_end
-        ;
-    } else if (MODE == Mode::Mixed) {
-        reg_final =                     // 0
-            reg_start +
-            "(" +                       // 1
-                reg_sl +                // 2, 3 (full_s), 4 (flag_s), 5 (arg_s), 6, 7, 8, 9, 10 (full_l), 11 (flag_l), 12 (arg_l)
+            reg_long +
                 "|" +
-                reg_ls +                // 13, 14 (full_l), 15 (flag_l), 16 (arg_l), 17, 18, 19, 20, 21 (full_s), 22 (flag_s), 23 (arg_s)
-                "|" +
-                "(" + reg_short + ")" + // 24 (full), 25 (flag), 26 (arg)
-                "|" +
-                "(" + reg_long +  ")" + // 27 (full), 28 (flag), 29 (arg)
-            ")" +
-            reg_end
-        ;
-    } else throw string{"invalid flag notation (expected short, long or mixed)"};
-    // cout << reg_final << endl;
+            reg_short +
+        ")" +
+        reg_end
+    ;
 
     try {
-        add_flags(commands, man_page, reg_final);
-        if (commands.size() == 0) throw string{"no flags found (try flag -m)"};
+        add_flags(commands, man_page, reg_final, cgc);
+        if (commands.size() == 0) throw string{"no flags found (try -m)"};
     } 
-    catch (const string & e) { throw e; }
+    catch (const string & e) {
+        throw e;
+    }
 }
 
 
